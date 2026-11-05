@@ -1,0 +1,2012 @@
+diff --git a/docs/AOT_SHARDING.md b/docs/AOT_SHARDING.md
+index 4a23127c..2ae218e9 100644
+--- a/docs/AOT_SHARDING.md
++++ b/docs/AOT_SHARDING.md
+@@ -68,6 +68,7 @@ Profiles declare these reusable methods:
+ | `images[].transfer_entries` | `{from: "mod_package_writes", count}`: J/JAL targets inside the image, taken only from words the selected package wrote. The count pins the inventory. Optional `exclude_writes: [{start, end, reason}]` names intervals of package-written DATA (for example a pack linked into the EXE that the package replaced) whose words are not transfers. |
+ | `images[].method = tagged_relocated_files` | Apply a trailing two-bit ABS32/HI16/LO16/J26 relocation stream to a verified `load_addr`, retaining only the original loader's image interval. Destinations are explicit evidence, never inferred from a historical RAM capture. |
+ | `images[].method = counted_relocated_members` | Verify each original container's SHA-256, classify every counted member, and relocate its image at each separately established heap placement. Pin `image_size` and `relocation_count`; each member needs nonempty unique `placements` or an explained exclusion. New placements remain interpreted. See [counted containers](COUNTED_MIPS_RELOCATIONS.md). |
++| `images[].method = relocated_extent_members` | The same relocation stream stored apart from its image, for example as two archive members. Each named member declares `image` and `relocations` as `{file, file_offset, size, sha256}` extents, pins `relocation_count`, and relocates at each separately established entry of `placements`. The stream must end exactly at its terminator. The archive's index format stays outside the core: the profile carries the offsets. New placements remain interpreted. See [separate streams](COUNTED_MIPS_RELOCATIONS.md#separate-streams). |
+ | `images[].entry_pointer_offsets` | Aligned image-relative offsets of loader-established callable exports. Read the pointer after relocation, ignore null callbacks, and require every nonnull callback to target aligned code inside the image. Pointer-shaped script/data fields are not callable exports. |
+ | `images[].method = psx_exe` | Read the load address and image from a PS-X EXE header; the generic extractor may split resident and overlay floors. |
+ | `images[].method = packed_sector_members` | Decode u32 count/offset sector descriptors across ordered payload files. Verify every member classification and requested full-payload coverage; use loader-established addresses for executable members. |
+diff --git a/docs/COUNTED_MIPS_RELOCATIONS.md b/docs/COUNTED_MIPS_RELOCATIONS.md
+index d0d4a85e..c479693c 100644
+--- a/docs/COUNTED_MIPS_RELOCATIONS.md
++++ b/docs/COUNTED_MIPS_RELOCATIONS.md
+@@ -73,3 +73,45 @@ python -m unittest discover -s tools/tests -p test_counted_mips_relocations.py
+ python -m unittest discover -s tools/tests -p test_counted_relocation_discovery.py
+ python -m unittest discover -s tools/tests -p test_aot_overlay_pipeline.py
+ ```
++
++## Separate streams
++
++Some engines store each image and its stream as two members of an archive
++instead of one counted container. The stream format and the four relocation
++kinds are the same; only the layout differs. `parse_stream(image, stream)`
++reads one such pair: the stream must be whole words that end exactly at the
++`0xFFFFFFFF` terminator, every target must lie inside the image, and no target
++may repeat.
++
++```python
++from counted_mips_relocations import parse_stream, relocate
++
++member = parse_stream(image_bytes, stream_bytes)
++image = relocate(member, independently_verified_image_base)
++```
++
++The AOT pipeline accepts these pairs as `relocated_extent_members`:
++
++```json
++{"method": "relocated_extent_members",
++ "members": [{"name": "MODULE",
++              "image":       {"file": "DATA.ARC", "file_offset": "0x10", "size": "0x2000", "sha256": "..."},
++              "relocations": {"file": "DATA.ARC", "file_offset": "0x2010", "size": "0x90", "sha256": "..."},
++              "relocation_count": 33,
++              "placements": [{"load_addr": "0x80150000"}]}]}
++```
++
++The archive's own index (names, offsets, sizes) is not parsed by the core. A
++title's tooling reads it from the player's disc and writes the extents into
++the profile; the SHA-256 of each extent pins the bytes the pipeline relocates.
++As with counted containers there is no destination address in the data: every
++placement must be established from the original loader, and a newly
++encountered heap placement stays interpreted until its own variant is added.
++Member names must be unique; each placement becomes the source `NAME@ADDRESS`.
++
++The separate-stream reader was compared byte for byte with the owned USA Rev 1
++Spider-Man 2: Enter Electro relocation routine (`0x8001EEF0`), executed
++instruction by instruction, for 28 modules at six RAM bases each, including the
++heap placements a play session established: 168 complete-image comparisons
++passed. A placement four bytes off, and the unrelocated image, both failed the
++same comparison. Owned bytes and captures are not part of this repository.
+diff --git a/docs/config_schema.md b/docs/config_schema.md
+index 43a12dec..5dcd55aa 100644
+--- a/docs/config_schema.md
++++ b/docs/config_schema.md
+@@ -589,13 +589,15 @@ overlay_region_floor = "0x10000"   # optional: lowest RAM address treated as ove
+ ```
+ 
+ `idle_skip` only elides loops with no stores and one interrupt-check edge.
++For every loop shape the distance to the next device event is measured from
++the current cycle, not from the devices' last service, so a skip never lands
++past the edge where the interrupt would be taken without it.
+ `idle_skip_store_counters = true` (with `idle_skip`; `PSX_IDLE_SKIP_EXT=0/1`
+ overrides it for one run) also elides loops that count a stack timeout down
+ by one each pass and span up to eight block edges: PsyQ libetc's `v_wait`,
+ the `VSync(0)`/`VSync(n)` spin most PsyQ titles run every frame. The skip
+ lowers the counter by the number of passes it skips (several edges per pass are
+-accepted only together with such a counter store; the device distance is
+-measured from the current cycle, not from the devices' last service) (never to 1 or below, so
++accepted only together with such a counter store) (never to 1 or below, so
+ the real timeout test still runs) and lands on the loop's first edge strictly
+ before the next device event, so an interrupt is taken at the same edge as
+ without it. Guest cycles, device-register writes and scratchpad writes are
+diff --git a/generated/OpenBIOS_dispatch.c b/generated/OpenBIOS_dispatch.c
+index 67f5443a..52d7c624 100644
+--- a/generated/OpenBIOS_dispatch.c
++++ b/generated/OpenBIOS_dispatch.c
+@@ -10,6 +10,7 @@
+ #include "cpu_state.h"
+ #include "psx_bios_backend.h"
+ #include "psx_segment_miss.h"
++#include "psx_bios_image.h"   /* SM2-Recomp round 2: shell_entry_phys for the HLE pre-check */
+ #include <stdint.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -9110,7 +9111,15 @@ static void psx_dispatch_impl(CPUState* cpu, uint32_t addr, uint32_t stop_addr)
+          * backends. Handled (rc 1) ⇒ the service completed against guest
+          * state and the guest resumes at $ra via the trampoline's normal
+          * return/tail contract below. rc 0 ⇒ pure LLE fall-through. */
++        /* SM2-Recomp round 2 (2026-11-02): the only hook (bios_hle.c,
++         * bios_hle_dispatch) acts on the A0/B0/C0 vectors and the shell entry
++         * and returns 0 with no effect for any other address, so the call is
++         * made only for those (same live shell_entry_phys it compares). */
+         if (!found && g_psx_bios_hle_hook &&
++            ((addr & 0x1FFFFFFFu) == 0xA0u || (addr & 0x1FFFFFFFu) == 0xB0u ||
++             (addr & 0x1FFFFFFFu) == 0xC0u ||
++             (psx_bios_image.shell_entry_phys != 0 &&
++              (addr & 0x1FFFFFFFu) == psx_bios_image.shell_entry_phys)) &&
+             g_psx_bios_hle_hook(cpu, addr & 0x1FFFFFFFu)) {
+             cpu->pc = cpu->gpr[31];
+             found = 1;
+@@ -9131,6 +9140,28 @@ static void psx_dispatch_impl(CPUState* cpu, uint32_t addr, uint32_t stop_addr)
+             found = 1;
+         }
+ #ifdef PSX_HAS_GAME_DISPATCH
++        /* SM2-Recomp fast route (2026-11-01, local edit of the generated
++         * trampoline; the emitter is unchanged). A target in RAM above the
++         * kernel window, not a mirror, and outside the shell copy window
++         * takes exactly one road through the general flow below: the
++         * shell-overlap tests are false, normalize() is the identity for
++         * it, no dispatch_table key lies in [0x5000, 0x1FC00000) so the
++         * binary search misses without side effects, and the flow ends in
++         * dirty_ram_dispatch(cpu, addr, stop_addr) (called twice when the
++         * target is dirty game text and the first call declines). Do that
++         * here and let the general flow skip its own calls (game_fast). */
++        int game_fast = 0;
++        if (!found) {
++            uint32_t gp = addr & 0x1FFFFFFFu;
++            if (gp >= 0x00005000u && gp < 0x00800000u &&
++                (gp & g_psx_ram_mask) == gp &&
++                (gp < 0x00030000u || gp > 0x00043D43u)) {
++                found = dirty_ram_dispatch(cpu, addr, stop_addr);
++                if (!found && psx_game_address_in_text(addr) && dirty_ram_is_dirty(gp))
++                    found = dirty_ram_dispatch(cpu, addr, stop_addr);
++                game_fast = 1;
++            }
++        }
+         /* Game EXEs can overlap the BIOS shell copy window at
+          * physical 0x30000-0x5AFFF. If the target belongs to the
+          * active game text range, route it through the game/dirty-RAM
+@@ -9169,13 +9200,15 @@ static void psx_dispatch_impl(CPUState* cpu, uint32_t addr, uint32_t stop_addr)
+         int game_text_in_shell_window =
+             game_phys >= 0x00030000u && game_phys <= 0x00043D43u &&
+             psx_game_address_in_text(addr) && dirty_ram_text_native_ok(game_phys);
+-        if (!found && (game_shell_overlap || game_text_in_shell_window ||
++        if (!found && !game_fast && (game_shell_overlap || game_text_in_shell_window ||
+             (psx_game_address_in_text(addr) && dirty_ram_is_dirty(game_phys)))) {
+             found = dirty_ram_dispatch(cpu, addr, stop_addr);
+         }
++#else
++        const int game_fast = 0;
+ #endif
+         uint32_t phys = normalize(addr);
+-        if (!found) {
++        if (!found && !game_fast) {
+         while (lo <= hi) {
+             int mid = (lo + hi) / 2;
+             if (dispatch_table[mid].addr == phys) {
+@@ -9212,7 +9245,7 @@ static void psx_dispatch_impl(CPUState* cpu, uint32_t addr, uint32_t stop_addr)
+          * boot, interpret the basic block on cpu state.  Falls back to
+          * psx_unknown_dispatch for genuinely unmapped PCs. */
+         if (!found) {
+-            if (dirty_ram_dispatch(cpu, addr, stop_addr)) {
++            if (!game_fast && dirty_ram_dispatch(cpu, addr, stop_addr)) {
+                 found = 1;
+             } else {
+                 psx_unknown_dispatch(cpu, addr, phys);
+@@ -9223,7 +9256,9 @@ static void psx_dispatch_impl(CPUState* cpu, uint32_t addr, uint32_t stop_addr)
+          * the real resume EPC and the RFE armed the escape — unwind to
+          * psx_check_interrupts here. A fiber/thread resume (in_exception==0) is a
+          * no-op, so the real EPC keeps dispatching. */
+-        psx_rfe_escape_check(cpu);
++        /* SM2-Recomp round 3: psx_rfe_escape_check acts only while an RFE
++         * escape is pending (its first test); skip the call otherwise. */
++        if (g_rfe_escape_pending) psx_rfe_escape_check(cpu);
+         if (g_psx_call_bail) {
+             /* A nested generated frame began a bail unwind; cpu->pc
+              * holds the guest's true target.  Resolve here iff the
+diff --git a/runtime/CMakeLists.txt b/runtime/CMakeLists.txt
+index 95cb813a..bc74dff4 100644
+--- a/runtime/CMakeLists.txt
++++ b/runtime/CMakeLists.txt
+@@ -2300,12 +2300,28 @@ if(BUILD_TESTING)
+     target_include_directories(idle_skip_store_counter_test PRIVATE include)
+     add_test(NAME idle_skip_store_counter_test COMMAND idle_skip_store_counter_test)
+ 
++    # idle_skip distance to the next event is measured from now, not from the
++    # devices' last service: a skip lands on the edge that takes the IRQ.
++    add_executable(idle_skip_device_lag_test
++        tests/test_idle_skip_device_lag.c
++        src/psx_cycles.c)
++    target_include_directories(idle_skip_device_lag_test PRIVATE include)
++    add_test(NAME idle_skip_device_lag_test COMMAND idle_skip_device_lag_test)
++
+     add_executable(psx_vblank_clock_test
+         tests/test_psx_vblank_clock.c
+         src/psx_vblank_clock.c)
+     target_include_directories(psx_vblank_clock_test PRIVATE include)
+     add_test(NAME psx_vblank_clock_test COMMAND psx_vblank_clock_test)
+ 
++    # idle_skip countdown register: read signed, so a loop that leaves below
++    # zero (bgez) keeps its exit pass instead of skipping to the next event.
++    add_executable(idle_skip_countdown_test
++        tests/test_idle_skip_countdown.c
++        src/psx_cycles.c)
++    target_include_directories(idle_skip_countdown_test PRIVATE include)
++    add_test(NAME idle_skip_countdown_test COMMAND idle_skip_countdown_test)
++
+     add_executable(psx_video_timing_test
+         tests/test_psx_video_timing.c
+         src/psx_video_timing.c)
+diff --git a/runtime/include/psx_fastpath.h b/runtime/include/psx_fastpath.h
+new file mode 100644
+index 00000000..9ebe3961
+--- /dev/null
++++ b/runtime/include/psx_fastpath.h
+@@ -0,0 +1,65 @@
++/* psx_fastpath.h — hot-path state mirrored as plain globals (SM2-Recomp, 2026-11-01).
++ *
++ * The per-block-edge interrupt check, the dispatch trampoline and the guest
++ * store path used to learn "is anything special going on?" by CALLING into
++ * half a dozen translation units (netplay, self-check, fntrace, parity trace,
++ * card audit, text translation). None of those answers changes more than a
++ * few times per session, so each is mirrored here as a plain int that the
++ * owning file keeps up to date, and the hot paths test the mirror inline.
++ *
++ * Contract: every mirror is CONSERVATIVE. "Clear" means the full path would
++ * find nothing to do; "set" only means "ask the full path", which stays the
++ * source of truth. Guest-visible behaviour is identical either way — the
++ * mirrors only decide whether a call that would have returned immediately is
++ * made at all. */
++#ifndef PSX_FASTPATH_H
++#define PSX_FASTPATH_H
++
++#include <stdint.h>
++#include "psx_cycles.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#if !defined(PSX_OVERLAY_DLL_BUILD) && !defined(__cplusplus)
++/* psx_get_cycle_count()'s value, inline, for runtime hot paths (the deferred
++ * charge batch and the function-local sink included). Lives here rather than
++ * in psx_cycles.h: that header is part of the overlay shard compile surface
++ * (codegen_hash_sources.cmake) and must not move for a runtime-only change. */
++static inline uint64_t psx_cycle_count_now(void) {
++    uint64_t n = psx_cycle_count + (uint64_t)g_psx_cyc_batch;
++    if (g_psx_cyc_local_acc) n += (uint64_t)(*g_psx_cyc_local_acc);
++    return n;
++}
++#endif
++
++/* psx_netplay.c: set with g_np.active. psx_netplay_active() additionally
++ * requires a live session, so this is a superset (clear => inactive). */
++extern int g_psx_netplay_flag;
++/* psx_selfcheck.c: the self-check phase; 0 == SC_OFF (psx_selfcheck_enabled()). */
++extern int g_psx_selfcheck_phase;
++/* fntrace.c: the game-start latch (fntrace_is_game_started()). */
++extern int g_fntrace_game_started;
++/* parity_trace.c: parity_trace_is_armed(). */
++extern uint32_t g_parity_trace_armed;
++/* card_data_writes.c: a card-byte destination capture is armed. */
++extern int g_card_data_writes_armed;
++/* text_xlate.cpp: capture or apply armed (text_xlate_on_dispatch has work). */
++extern int g_text_xlate_armed;
++/* mod_runtime.cpp: the main-EXE mod plan has been applied (or rejected), so
++ * mod_runtime_on_dispatch has nothing left to do. */
++extern int g_mod_runtime_main_done;
++
++/* memory.c: generation of "what can change whether static game text is still
++ * valid": every dirty-page mark, guarded-write mismatch, divergence flag,
++ * baseline clear, reference-image change, bitmap restore and every direct
++ * RAM write that bypasses the store path (dirty_ram_text_gen_bump) bumps it. Never 0. dirty_ram_text_native_ok_ranges_from
++ * caches a positive verdict per entry PC under this generation. */
++extern uint32_t g_psx_text_gen;
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* PSX_FASTPATH_H */
+diff --git a/runtime/include/psx_idle_state.h b/runtime/include/psx_idle_state.h
+new file mode 100644
+index 00000000..9b1da8e9
+--- /dev/null
++++ b/runtime/include/psx_idle_state.h
+@@ -0,0 +1,66 @@
++/* psx_idle_state.h — the idle-loop skip detector's state (psx_cycles.c), in one
++ * struct so the interrupt-check fast path (interrupts.c) can perform the
++ * detector's trivial "new resume PC" step inline (SM2-Recomp, 2026-11-01).
++ *
++ * The detector itself is unchanged: psx_idle_note_check() in psx_cycles.c is
++ * the only code that trains, snapshots or skips. The fast path only takes the
++ * one step that psx_idle_note_check takes when the resume PC differs from the
++ * remembered one and no extension anchor is listed: forget the old PC, reset
++ * the evidence and re-stamp the counters (see psx_idle_note_fast_step). */
++#ifndef PSX_IDLE_STATE_H
++#define PSX_IDLE_STATE_H
++
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++enum { PSX_IDLE_SITES_MAX = 16 };
++
++typedef struct PsxIdleState {
++    uint32_t pc;                 /* resume PC the evidence is about (0 = none) */
++    uint32_t quantum;
++    uint32_t streak;
++    int      have_snap;          /* GPR snapshot valid for pc */
++    uint32_t gpr[32];
++    uint32_t hi, lo;
++    int      progress_reg;       /* -2 unknown, -1 stable, 1..31 countdown */
++    int32_t  progress_delta;
++    uint64_t last_cycle;
++    uint64_t last_stores;
++    uint64_t last_mmio;
++    uint32_t edges;              /* non-anchor edges since the anchor */
++    uint32_t iter_edges;         /* edges in the last whole iteration */
++    uint32_t store_addr;
++    uint32_t store_val;
++    int      mem_progress;
++    uint32_t sites[PSX_IDLE_SITES_MAX];
++    int      site_count;
++    int      audited_only;
++    /* Store-tracking gate shared with memory.c (psx_idle_skip_set_store_tracker)
++     * and the value idle_skip_ext_on() writes to it on every full pass. */
++    int     *track;
++    int      track_value;
++    /* 1 once a full psx_idle_note_check pass has run with the environment
++     * latched (PSX_IDLE_SKIP_EXT read, *track set): only then may the inline
++     * trivial step stand in for a full pass. */
++    int      fast_ready;
++} PsxIdleState;
++
++extern PsxIdleState g_psx_idle;
++/* psx_cycles.c: overlay loader suppression of idle-note observations. */
++extern int g_idle_note_suppress;
++
++/* 1 if pc is one of the audited store-counter anchor sites. */
++static inline int psx_idle_site_listed(uint32_t pc) {
++    for (int i = 0; i < g_psx_idle.site_count; i++)
++        if (g_psx_idle.sites[i] == pc) return 1;
++    return 0;
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* PSX_IDLE_STATE_H */
+diff --git a/runtime/src/card_data_writes.c b/runtime/src/card_data_writes.c
+index 38a2c4c6..b53b60c8 100644
+--- a/runtime/src/card_data_writes.c
++++ b/runtime/src/card_data_writes.c
+@@ -9,7 +9,9 @@ extern uint32_t g_debug_last_store_pc;
+ 
+ /* "Armed" byte from the most recent SIO_RX_DATA read inside a card
+  * data phase. The next matching RAM write captures it. */
+-static volatile int      s_armed = 0;
++volatile int             g_card_data_writes_armed_v = 0;   /* was static s_armed */
++int                      g_card_data_writes_armed = 0;     /* psx_fastpath.h mirror */
++#define s_armed g_card_data_writes_armed_v
+ static uint8_t           s_armed_value = 0;
+ static uint16_t          s_armed_state = 0;
+ static uint8_t           s_armed_idx   = 0;
+@@ -28,6 +30,7 @@ void card_data_writes_arm(uint8_t value, uint16_t mc_state,
+     s_armed_idx   = mc_data_idx;
+     s_armed_slot  = slot;
+     s_armed = 1;
++    g_card_data_writes_armed = 1;
+ }
+ 
+ int card_data_writes_check(uint32_t phys, uint32_t value, uint8_t width) {
+@@ -51,6 +54,7 @@ int card_data_writes_check(uint32_t phys, uint32_t value, uint8_t width) {
+     s_head = (s_head + 1) % CARD_DATA_WRITES_CAP;
+ 
+     s_armed = 0;
++    g_card_data_writes_armed = 0;
+     return 1;
+ }
+ 
+@@ -70,4 +74,5 @@ void card_data_writes_reset(void) {
+     s_seq = 0;
+     s_head = 0;
+     s_armed = 0;
++    g_card_data_writes_armed = 0;
+ }
+diff --git a/runtime/src/cosim_state.c b/runtime/src/cosim_state.c
+index 9a04f8a2..73c0a42e 100644
+--- a/runtime/src/cosim_state.c
++++ b/runtime/src/cosim_state.c
+@@ -159,6 +159,7 @@ uint64_t cosim_state_hash(CosimSubHashes *sub) {
+     /* apply pending gate-4 injection to live state */
+     if (s_inj_ram_phys >= 0 && (uint32_t)s_inj_ram_phys < RAM_SIZE) {
+         ram[s_inj_ram_phys] ^= s_inj_ram_xor; cosim_note_ram_write((uint32_t)s_inj_ram_phys, 1);
++        { extern void dirty_ram_text_gen_bump(void); dirty_ram_text_gen_bump(); }
+         s_inj_ram_phys = -1;
+     }
+     if (s_inj_reg >= 0 && cpu) {
+diff --git a/runtime/src/data_shards.c b/runtime/src/data_shards.c
+index ccd7c668..9a675c16 100644
+--- a/runtime/src/data_shards.c
++++ b/runtime/src/data_shards.c
+@@ -43,6 +43,7 @@
+ #endif
+ 
+ extern uint8_t *memory_get_ram_ptr(void);
++extern const uint8_t *memory_get_ram_ptr_const(void);   /* read-only RAM view (psx_fastpath.h) */
+ extern uint8_t *memory_get_scratchpad_ptr(void);
+ extern void psx_write_word(uint32_t addr, uint32_t val);
+ extern void psx_write_byte(uint32_t addr, uint8_t val);
+@@ -151,7 +152,7 @@ static int64_t ds_index_of(uint32_t addr) {
+ }
+ 
+ static uint8_t ds_live_byte(uint32_t idx) {
+-    return idx < DS_RAM_BYTES ? memory_get_ram_ptr()[idx]
++    return idx < DS_RAM_BYTES ? memory_get_ram_ptr_const()[idx]
+                               : memory_get_scratchpad_ptr()[idx - DS_RAM_BYTES];
+ }
+ 
+@@ -387,7 +388,7 @@ static int ds_verify(const DsShard* s) {
+     for (uint32_t r = 0; r < s->nrd; r++) {
+         uint32_t idx = s->rd[r].idx, len = s->rd[r].len;
+         const uint8_t* live = idx < DS_RAM_BYTES
+-            ? memory_get_ram_ptr() + idx
++            ? memory_get_ram_ptr_const() + idx
+             : memory_get_scratchpad_ptr() + (idx - DS_RAM_BYTES);
+         /* a range never straddles the RAM/scratch boundary by construction */
+         if (memcmp(live, s->rd_bytes + off, len) != 0) return 0;
+diff --git a/runtime/src/dirty_ram_interp.c b/runtime/src/dirty_ram_interp.c
+index 70044164..71f8a391 100644
+--- a/runtime/src/dirty_ram_interp.c
++++ b/runtime/src/dirty_ram_interp.c
+@@ -23,6 +23,7 @@
+  * meaningful fraction of total runtime work.
+  */
+ 
++#include "psx_fastpath.h"
+ #include "dirty_ram_interp.h"
+ #include "cpu_state.h"
+ #include "debug_server.h"
+@@ -44,6 +45,7 @@
+ #include <stdint.h>
+ #include <stdlib.h>
+ #include <string.h>
++extern const uint8_t *memory_get_ram_ptr_const(void);   /* read-only RAM view (psx_fastpath.h) */
+ 
+ uint64_t g_dirty_ram_blocks_run = 0;
+ uint64_t g_dirty_ram_insns_run  = 0;
+@@ -568,7 +570,7 @@ static inline uint32_t fetch_word(uint32_t phys) {
+     /* Main RAM is a process-lifetime static allocation. Cache its address so
+      * instruction fetch does not cross translation units for every guest op. */
+     static const uint8_t *ram;
+-    if (!ram) ram = memory_get_ram_ptr();
++    if (!ram) ram = memory_get_ram_ptr_const();
+     phys = psx_ram_map_read(phys);
+     return  (uint32_t)ram[phys]
+          | ((uint32_t)ram[phys + 1] <<  8)
+@@ -2700,7 +2702,7 @@ int dirty_ram_dispatch(CPUState* cpu, uint32_t addr, uint32_t stop_addr) {
+      * BIOS boot — the shell/kernel run relocated RAM code above 0x10000 —
+      * and the handoff's baseline/scratch clears then corrupt the boot
+      * (observed: MoH SLUS-00974 garbage-jump/VBLANK-wedge, 2026-08-06). */
+-    fntrace_maybe_mark_game_started(cpu, addr);
++    if (!g_fntrace_game_started) fntrace_maybe_mark_game_started(cpu, addr);   /* psx_fastpath.h: latched once */
+     if (addr == 0x8001A954u)      site_note(&g_site_dd954);   /* loop head re-dispatch */
+     else if (addr == 0x80046264u) site_note(&g_site_dd264);   /* loop tail re-dispatch */
+     int prev = g_dirty_interp_active;
+@@ -3102,6 +3104,12 @@ int psx_slice_block_impl(CPUState *cpu, uint32_t block_addr, uint32_t bcyc, int
+     return 1;
+ }
+ 
++/* Function-window divergence probe state (defined further down with the
++ * probe itself); forward-declared so the dispatch path can test the
++ * armed flags inline before calling ls_func_enter / ls_func_exit. */
++static uint32_t s_lsf_frame_hi;
++static int      s_lsf_active;
++
+ static int dirty_ram_dispatch_inner(CPUState* cpu, uint32_t addr, uint32_t stop_addr) {
+     /* phys = CODE identity (segment-stripped PC: compiled-body and overlay
+      * lookups, per-PC telemetry). ram_phys = BYTE identity (the live-geometry
+@@ -3141,12 +3149,14 @@ static int dirty_ram_dispatch_inner(CPUState* cpu, uint32_t addr, uint32_t stop_
+     if (!forced && psx_game_text_native_ok(addr)) {
+         g_mixed_depth++;
+         {
+-            ls_func_enter(addr, cpu);
++            /* The function-window divergence probe is armed by a TCP command
++             * only (ls_func_set_window); off, both calls return at once. */
++            if (s_lsf_frame_hi != 0) ls_func_enter(addr, cpu);
+             int prev_phase = g_exec_phase;
+             g_exec_phase = 3;
+             int _gc = psx_dispatch_game_compiled(cpu, addr);
+             g_exec_phase = prev_phase;
+-            ls_func_exit(addr, cpu, _gc);
++            if (s_lsf_active) ls_func_exit(addr, cpu, _gc);
+             g_mixed_depth--;
+             if (_gc) return 1;
+         }
+@@ -3862,7 +3872,8 @@ static int      s_ls_div_trace_n = 0, s_ls_div_idx = 0;
+ 
+ static int s_ls_record_only = 0;   /* diagnostic: record but skip inline replay (perturbation test) */
+ 
+-static uint32_t s_lsf_frame_lo = 0, s_lsf_frame_hi = 0; /* hi==0 => disabled */
++static uint32_t s_lsf_frame_lo = 0;
++static uint32_t s_lsf_frame_hi = 0;                       /* hi==0 => disabled */
+ static int      s_lsf_record_only = 0;
+ static int      s_lsf_active = 0;
+ static int      s_lsf_recording = 0;
+diff --git a/runtime/src/fntrace.c b/runtime/src/fntrace.c
+index 6b08fcd7..6e6852c3 100644
+--- a/runtime/src/fntrace.c
++++ b/runtime/src/fntrace.c
+@@ -1,5 +1,7 @@
+ /* fntrace.c — runtime side of psx_dispatch call ring. See fntrace.h. */
+ 
++#include "psx_fastpath.h"
++#include "psx_cycles.h"
+ #include "fntrace.h"
+ #include "psx_bss.h"
+ #include "text_xlate.h"     /* on-the-fly string translation hook (framework) */
+@@ -34,7 +36,8 @@ static uint32_t s_arm_record_all = 0;  /* opt-in via fntrace_arm(0xFFFFFFFF) */
+  * false-triggering on the BIOS shell, which runs from RAM 0x30000-0x5B000 —
+  * overlapping the game text range but never at entry_pc. */
+ static uint32_t s_game_entry_phys = 0;
+-static int      s_game_started = 0;
++int             g_fntrace_game_started = 0;   /* psx_fastpath.h; was static s_game_started */
++#define s_game_started g_fntrace_game_started
+ extern void cdrom_notify_game_started(void);
+ extern void boot_state_trigger_capture(const CPUState* cpu);
+ 
+@@ -132,15 +135,15 @@ uint64_t      g_disp_tail_seq = 0;
+ 
+ void fntrace_record(CPUState* cpu, uint32_t target) {
+     /* The BIOS has completed the PS-X EXE load by the time it dispatches the
+-     * entry point. Apply the validated plan before the first guest instruction. */
+-    mod_runtime_on_dispatch(target);
++     * entry point. Apply the validated plan before the first guest instruction.
++     * (psx_fastpath.h: once the plan is applied the hook has nothing to do.) */
++    if (!g_mod_runtime_main_done) mod_runtime_on_dispatch(target);
+     {
+-        extern uint64_t psx_get_cycle_count(void);
+         DispTailEntry *t = &g_disp_tail[g_disp_tail_seq % DISP_TAIL_CAP];
+         t->target = target;
+         t->ra     = cpu->gpr[31];
+         t->sp     = cpu->gpr[29];
+-        t->cycle  = psx_get_cycle_count();
++        t->cycle  = psx_cycle_count_now();
+         g_disp_tail_seq++;
+     }
+     {
+@@ -172,12 +175,12 @@ void fntrace_record(CPUState* cpu, uint32_t target) {
+      * (b) repoint a string-arg at a translated replacement so the game's own
+      * renderer draws it. Cheap no-op when uninitialised/disarmed. No BIOS regen
+      * (runtime-side), works in Release. See docs/STRING_TRANSLATION.md. */
+-    text_xlate_on_dispatch(cpu, target);
++    if (g_text_xlate_armed) text_xlate_on_dispatch(cpu, target);   /* psx_fastpath.h mirror */
+ 
+     /* General parity ring: one DISPATCH row per leader while current_tcb matches
+      * the watched thread. Gated by the cheap armed flag so disarmed runs pay only
+      * a single branch on this hot path. pc==target (the leader being entered). */
+-    if (parity_trace_is_armed()) {
++    if (g_parity_trace_armed) {
+         parity_trace_record(PARITY_KIND_DISPATCH, target, cpu->gpr[31],
+                             cpu->gpr[29], target, parity_rw_cb, cpu);
+     }
+diff --git a/runtime/src/interrupts.c b/runtime/src/interrupts.c
+index fd390f9a..0ee78562 100644
+--- a/runtime/src/interrupts.c
++++ b/runtime/src/interrupts.c
+@@ -43,6 +43,8 @@
+ #include "psx_scheduler.h"
+ #include "psx_video_timing.h"
+ #include "spu.h"
++#include "psx_fastpath.h"
++#include "psx_idle_state.h"
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -1133,7 +1135,8 @@ void psx_check_interrupts(CPUState* cpu) {
+     /* Frozen guest time (psx_cycle_freeze.h): no delivery, and no
+      * check-boundary bookkeeping that the stock timeline would not do. */
+     if (g_psx_guest_time_frozen) return;
+-    psx_cyc_batch_flush();
++    if (g_psx_cyc_batch || (g_psx_cyc_local_acc && *g_psx_cyc_local_acc))
++        psx_cyc_batch_flush();   /* no effect when nothing is pending (round 2) */
+     extern int g_ls_suppress_record;
+     extern int psx_netplay_active(void);
+     const int np_active = psx_netplay_active();
+@@ -2251,15 +2254,122 @@ irq_deliver_eval:
+  * interrupts via psx_check_interrupts (cpu->pc / scratch sentinel). Forwarding
+  * here gives the mmx6 baseline interrupt behavior — sufficient to build+run the
+  * current generated code on the good baseline for instrumented comparison. */
+-void psx_check_interrupts_at(CPUState* cpu, uint32_t resume_pc) {
++/* Block-edge fast path (SM2-Recomp, 2026-11-01). Generated code calls
++ * psx_check_interrupts_at at every basic-block edge (120k times a frame in
++ * Spider-Man 2's gameplay). On the overwhelmingly common edge nothing is
++ * pending and psx_check_interrupts takes its "none pending" path, whose only
++ * effects are: publish the deferred charge batch, count the entry, stamp the
++ * last-check PC/cycle, give the idle detector this edge, count the fast exit,
++ * tick the maintenance throttle and release one lockstep suppress credit. That
++ * path used to cost nine calls across six files; this function performs the
++ * same effects inline, in the same order, and defers to the full function the
++ * moment any of its preconditions does not hold. Every condition below is a
++ * read of state the full path tests at the same point:
++ *   - frozen guest time: the full path returns at once (same here);
++ *   - netplay / self-check / staged savestate / dirty-interpreter resume PC /
++ *     lockstep record-replay / idle-note suppression: handled only there;
++ *   - in_exception, a pending unmasked IRQ, a COP0 software interrupt or a
++ *     deferred thread switch: delivery or the mid path, only there;
++ *   - the idle detector: only its trivial "new resume PC" step is taken
++ *     inline (psx_idle_state.h); a repeated PC, an audited anchor, the
++ *     audited-only mode or an unlatched environment all go to the full pass;
++ *   - the 16K-edge maintenance poll stays in the full path: the edge that
++ *     would reach it is handed over before anything is counted. */
++/* Round 5 (2026-11-02): the fast path below without its first two steps
++ * (frozen time, deferred-charge flush), for an edge where the caller has
++ * seen time running and nothing batched. It makes no call, so the common
++ * edge runs as a leaf with no stack frame. Every test comes before every
++ * effect: a 0 return has changed nothing and the caller may run the full
++ * sequence from the top. */
++#if defined(__GNUC__) || defined(__clang__)
++__attribute__((always_inline))
++#endif
++static inline int psx_irq_edge_fast_nb(CPUState* cpu, uint32_t resume_pc) {
++    extern int g_ls_replay_active, g_ls_mode, g_precise_mode, g_psx_call_bail;
++    extern int g_ls_suppress_record;
++    extern uint32_t g_dirty_safe_resume_pc;
++    extern uint64_t g_guest_store_count, g_mmio_access_count;
++    if (g_psx_netplay_flag || g_psx_selfcheck_phase || g_psx_savestate_pending ||
++        g_dirty_safe_resume_pc != 0u || in_exception || s_defer_switch_pending)
++        return 0;
++    if ((i_stat & i_mask) != 0u) return 0;           /* mid path / delivery */
++    if ((cpu->cop0[COP0_CAUSE] & cpu->cop0[COP0_SR] & 0x0300u) != 0u) return 0;
++    if (g_idle_skip_enabled < 0) return 0;           /* lazy environment read: full path */
++    if (((s_fast_maintenance + 1u) & 0x3FFFu) == 0u) return 0;   /* maintenance edge */
++    if (g_idle_skip_enabled > 0) {
++        /* The idle detector's trivial step applies only when it would not
++         * train, snapshot or skip: psx_idle_note_check's final `else`. */
++        if (!g_psx_idle.fast_ready || g_psx_idle.audited_only ||
++            g_ls_replay_active || g_idle_note_suppress || resume_pc == 0u ||
++            g_psx_call_bail || g_precise_mode || g_ls_mode != 0 ||
++            resume_pc == g_psx_idle.pc)
++            return 0;
++        if (g_psx_idle.pc != 0u && psx_idle_site_listed(g_psx_idle.pc)) return 0;  /* anchor: inner edge */
++        if (g_psx_idle.pc == 0u && psx_idle_site_listed(resume_pc)) return 0;      /* site: extension */
++    }
++    /* --- effects, in the full path's order --- */
++    s_irq_path_entry++;
++    if (g_idle_skip_enabled > 0) {
++        s_last_interrupt_check_pc = resume_pc;
++        s_last_interrupt_check_cycle = psx_cycle_count;   /* batch is 0 after the flush */
++        /* psx_idle_note_check, trivial step: idle_skip_ext_on() rewrites the
++         * store-tracking gate, then the `else` branch forgets the old PC. */
++        if (g_psx_idle.track) *g_psx_idle.track = g_psx_idle.track_value;
++        g_psx_idle.pc = resume_pc;
++        g_psx_idle.streak = 0;
++        g_psx_idle.quantum = 0;
++        g_psx_idle.progress_reg = -2;
++        g_psx_idle.progress_delta = 0;
++        g_psx_idle.mem_progress = 0;
++        g_psx_idle.have_snap = 0;
++        g_psx_idle.store_addr = 0xFFFFFFFFu;
++        g_psx_idle.edges = 0;
++        g_psx_idle.last_cycle = psx_cycle_count;
++        g_psx_idle.last_stores = g_guest_store_count;
++        g_psx_idle.last_mmio = g_mmio_access_count;
++    }
++    s_irq_path_fast_none++;
++    ++s_fast_maintenance;
++    if (g_ls_suppress_record > 0) g_ls_suppress_record--;
++    return 1;
++}
++
++static inline int psx_irq_edge_fast(CPUState* cpu, uint32_t resume_pc) {
++    if (g_psx_guest_time_frozen) return 1;          /* full path: immediate return */
++    /* Same first action as the full path. With no batched or function-local
++     * charge pending psx_cyc_batch_flush has no effect (psx_cycles.h), so the
++     * call is skipped then (round 2, 2026-11-02). */
++    if (g_psx_cyc_batch || (g_psx_cyc_local_acc && *g_psx_cyc_local_acc))
++        psx_cyc_batch_flush();
++    return psx_irq_edge_fast_nb(cpu, resume_pc);
++}
++
++/* The original sequence, kept out of line (round 5): the fast path with its
++ * flush step, then the full psx_check_interrupts. */
++#if defined(__GNUC__) || defined(__clang__)
++__attribute__((noinline))
++#endif
++static void psx_check_interrupts_at_slow(CPUState* cpu, uint32_t resume_pc) {
++    if (psx_irq_edge_fast(cpu, resume_pc)) return;
+     uint32_t prev = s_compiled_interrupt_resume_pc;
+     s_compiled_interrupt_resume_pc = resume_pc;
+     psx_check_interrupts(cpu); /* flushes load-charge batch on entry */
+     s_compiled_interrupt_resume_pc = prev;
+ }
+ 
++void psx_check_interrupts_at(CPUState* cpu, uint32_t resume_pc) {
++    /* Common edge (round 5): time running, nothing batched, fast path taken.
++     * Otherwise (or when the fast path declines, having changed nothing) the
++     * original sequence runs from its first step. */
++    if (!g_psx_guest_time_frozen && !g_psx_cyc_batch &&
++        !(g_psx_cyc_local_acc && *g_psx_cyc_local_acc) &&
++        psx_irq_edge_fast_nb(cpu, resume_pc))
++        return;
++    psx_check_interrupts_at_slow(cpu, resume_pc);
++}
++
+ int psx_interrupts_checked_at_current_cycle(uint32_t resume_pc) {
+-    return s_last_interrupt_check_cycle == psx_get_cycle_count() &&
++    return s_last_interrupt_check_cycle == psx_cycle_count_now() &&
+            same_guest_pc(s_last_interrupt_check_pc, resume_pc);
+ }
+ 
+diff --git a/runtime/src/main.cpp b/runtime/src/main.cpp
+index 886c0db0..2ff10a5b 100644
+--- a/runtime/src/main.cpp
++++ b/runtime/src/main.cpp
+@@ -16992,8 +16992,9 @@ namespace {
+ /* [timing] guest_cycle_scale_gate reader: main RAM only, side-effect free
+  * (aligned little-endian word of the given size). */
+ extern "C" uint8_t* memory_get_ram_ptr(void);
++extern "C" const uint8_t *memory_get_ram_ptr_const(void);   /* read-only RAM view (psx_fastpath.h) */
+ static uint32_t gcs_gate_read_ram(uint32_t phys, uint32_t size) {
+-    const uint8_t* ram = (const uint8_t*)memory_get_ram_ptr();
++    const uint8_t* ram = memory_get_ram_ptr_const();
+     const uint32_t bytes = (uint32_t)memory_get_ram_bytes();
+     if (!ram || !bytes) return 0;
+     const uint32_t a = phys & (bytes - 1u);
+diff --git a/runtime/src/memory.c b/runtime/src/memory.c
+index efe3881e..6690a976 100644
+--- a/runtime/src/memory.c
++++ b/runtime/src/memory.c
+@@ -8,6 +8,7 @@
+  *   Everything else         — fatal abort (unmapped)
+  */
+ 
++#include "psx_fastpath.h"
+ #include "cpu_state.h"
+ #include "cdrom.h"
+ #include "crash_trace.h"
+@@ -181,8 +182,18 @@ static inline uint32_t psx_phys_addr_store(uint32_t addr) {
+     return psx_ram_map_write(addr);
+ }
+ 
++/* psx_fastpath.h: text-validity generation. Bumped by everything that can
++ * change whether a static game-text entry is still native-safe (see the
++ * header). Never 0, so a zeroed cache slot never matches. */
++uint32_t g_psx_text_gen = 1;
++static inline void text_gen_bump(void) { if (++g_psx_text_gen == 0u) g_psx_text_gen = 1u; }
++
+ /* Expose RAM pointer for oracle comparison (find_first_divergence). */
+ uint8_t *memory_get_ram_ptr(void) { return ram; }
++const uint8_t *memory_get_ram_ptr_const(void) { return ram; }
++/* For the few places that write RAM through the raw pointer instead of the
++ * store path (shadow restores, text patches): expire cached text verdicts. */
++void dirty_ram_text_gen_bump(void) { text_gen_bump(); }
+ uint8_t *memory_get_scratchpad_ptr(void) { return scratchpad; }
+ 
+ /* Side-effect-FREE aligned word peek for the debug/observability path ONLY:
+@@ -257,7 +268,7 @@ static inline void dirty_ram_mark_page(uint32_t phys) {
+      * writes land here on every guest store, and bumping per write would
+      * invalidate the per-PC site caches continuously. Overlay (re)loads always
+      * bump via dirty_ram_mark_executable_range. */
+-    if (!(dirty_ram_bitmap[page >> 5] & bit)) g_dirty_ram_code_gen++;
++    if (!(dirty_ram_bitmap[page >> 5] & bit)) { g_dirty_ram_code_gen++; text_gen_bump(); }
+     dirty_ram_bitmap[page >> 5] |= bit;
+ }
+ 
+@@ -524,6 +535,7 @@ void dirty_ram_clear_image_baseline(void) {
+     uint32_t last_page  = (floor - 1u) >> DIRTY_RAM_PAGE_SHIFT;
+     for (uint32_t page = first_page; page <= last_page; page++)
+         dirty_ram_bitmap[page >> 5] &= ~(1u << (page & 31u));
++    text_gen_bump();
+ }
+ 
+ /* Text-image divergence guard.
+@@ -561,6 +573,7 @@ void dirty_ram_register_text_image(uint32_t phys_lo, const uint8_t *bytes,
+     if (!bytes || len == 0 || phys_lo >= RAM_LIVE) return;
+     if (len > RAM_LIVE - phys_lo) len = RAM_LIVE - phys_lo;
+     text_ref_image = (uint8_t *)bytes;  /* runtime-owned mutable heap buffer */
++    text_gen_bump();
+     text_ref_lo = phys_lo;
+     text_ref_hi = phys_lo + len;
+     memset(text_modified_bitmap, 0, sizeof(text_modified_bitmap));
+@@ -586,6 +599,7 @@ static inline void text_guard_note_write(uint32_t phys, uint32_t val, int size)
+     if (memcmp(ref, buf, (size_t)size) != 0) {
+         uint32_t page = phys >> DIRTY_RAM_PAGE_SHIFT;
+         text_modified_bitmap[page >> 5] |= (1u << (page & 31u));
++        text_gen_bump();   /* bytes of a text page changed: cached verdicts expire */
+     }
+ }
+ 
+@@ -624,6 +638,7 @@ int dirty_ram_text_native_ok(uint32_t phys) {
+         return 1;
+ 
+     text_diverged_bitmap[page >> 5] |= bit;
++    text_gen_bump();
+     g_text_diverged_pages++;
+     g_text_native_blocked++;
+     return 0;
+@@ -643,12 +658,29 @@ int dirty_ram_text_native_ok(uint32_t phys) {
+  * clipped-away region, executing stale static code (CMR2 overlay
+  * corruption, second locus 0x80016B34). A genuinely patched prologue now
+  * blocks the whole entry to the interpreter — correct, merely slower. */
++/* Positive-verdict cache (SM2-Recomp, 2026-11-01). The verdict for a static
++ * entry depends only on the entry's ranges (immutable), the page bitmaps and
++ * the live text bytes; every change to the latter two bumps g_psx_text_gen
++ * (see psx_fastpath.h). A slot remembers "entry exec_pc with these ranges was
++ * verified valid at generation G"; while G is current the answer is still 1
++ * and the page walk / compare is skipped. Negative verdicts are never cached:
++ * they keep their counters and their full evaluation. Slots are direct-mapped
++ * by exec_pc; a collision only costs a re-verification. */
++typedef struct { uint32_t pc; uint32_t gen; const uint32_t *ranges; } TextOkSlot;
++#define TEXT_OK_SLOTS 8192u
++static TextOkSlot s_text_ok_cache[TEXT_OK_SLOTS];
++static inline TextOkSlot *text_ok_slot(uint32_t exec_pc) {
++    return &s_text_ok_cache[(exec_pc * 2654435761u) >> 19];   /* 13-bit multiplicative hash */
++}
++
+ int dirty_ram_text_native_ok_ranges_from(const uint32_t *lo_len_pairs,
+                                          uint32_t count,
+                                          uint32_t exec_pc) {
+     if (!text_ref_image || !lo_len_pairs || count == 0) return 0;
+     if (dirty_ram_force_interp()) return 0;
+-    (void)exec_pc;
++    TextOkSlot *slot = text_ok_slot(exec_pc);
++    if (slot->pc == exec_pc && slot->gen == g_psx_text_gen && slot->ranges == lo_len_pairs)
++        return 1;
+     int any = 0;
+     for (uint32_t i = 0; i < count; i++) {
+         uint32_t phys = lo_len_pairs[i * 2u] & 0x1FFFFFFFu;
+@@ -699,6 +731,9 @@ int dirty_ram_text_native_ok_ranges_from(const uint32_t *lo_len_pairs,
+         g_text_native_blocked++;
+         return 0;
+     }
++    slot->pc = exec_pc;
++    slot->ranges = lo_len_pairs;
++    slot->gen = g_psx_text_gen;
+     return 1;
+ }
+ 
+@@ -740,6 +775,7 @@ void dirty_ram_text_bless(uint32_t phys, const uint8_t *bytes, uint32_t len) {
+     const uint8_t *src = bytes + (lo - phys);
+     if (memcmp(ref, src, hi - lo) == 0) return;                     /* already in sync */
+     memcpy(ref, src, hi - lo);
++    text_gen_bump();
+     /* Re-open the affected pages: clear the sticky diverged bit so the next
+      * dispatch re-runs the compare against the now-updated reference. */
+     uint32_t first_page = lo >> DIRTY_RAM_PAGE_SHIFT;
+@@ -771,6 +807,7 @@ void dirty_ram_mark_executable_range(uint32_t phys, uint32_t len) {
+         dirty_ram_bitmap[page >> 5] |= (1u << (page & 31u));
+     }
+     g_dirty_ram_code_gen++;
++    text_gen_bump();
+ }
+ 
+ /* Force-interp mode (tooling): PSX_FORCE_INTERP=1 makes ALL RAM above the kernel
+@@ -847,6 +884,7 @@ void dirty_ram_set_bitmap_words(const uint32_t* words, uint32_t count) {
+     /* Bitmap replace bypasses clean→dirty transitions; bump so interpreter
+      * site caches keyed on g_dirty_ram_code_gen cannot survive a restore. */
+     g_dirty_ram_code_gen++;
++    text_gen_bump();
+ }
+ 
+ /* ---- Inc3: watched overlay pages + per-page generation counters ---------
+@@ -867,6 +905,7 @@ static uint32_t overlay_watch_bitmap[DIRTY_RAM_BITMAP_WORDS];
+ static uint32_t overlay_page_gen[DIRTY_RAM_PAGE_COUNT];
+ 
+ void dirty_ram_reset_for_boot(void) {
++    text_gen_bump();
+     memset(dirty_ram_bitmap, 0, sizeof(dirty_ram_bitmap));
+     memset(text_modified_bitmap, 0, sizeof(text_modified_bitmap));
+     memset(text_diverged_bitmap, 0, sizeof(text_diverged_bitmap));
+@@ -936,6 +975,7 @@ void dirty_ram_text_guard_resync_after_restore(void) {
+      * and the writes happened in the process that produced it. One pass
+      * over the reference range (at most 2 MB, once per restore) puts every
+      * mismatching page back under the exact compare. */
++    text_gen_bump();
+     memset(text_modified_bitmap, 0, sizeof(text_modified_bitmap));
+     memset(text_diverged_bitmap, 0, sizeof(text_diverged_bitmap));
+     g_text_diverged_pages = 0;
+@@ -2034,14 +2074,14 @@ static void psx_write_word_raw(uint32_t addr, uint32_t val) {
+      * Keys for relocated SCPH-1001 code go through scph1001_relocated_store()
+      * (runtime PC, ROM address); Kernel Part 2 runs at 0x500 from ROM
+      * 0xBFC10000. */
+-    if (fntrace_is_game_started() &&
++    if (g_fntrace_game_started &&
+         phys < 0x10u && scph1001_relocated_store(0x00000F00u, 0xBFC10A00u)) return;
+ 
+     /* BIOS helpers use RAM address zero as a tiny delay-loop scratch between
+      * device-register polls. Treat these two dummy stores as non-visible; real
+      * hardware / Beetle preserve Tomba 2's sector-63 card-management payload
+      * when it passes buffer=0 to _card_write. */
+-    if (fntrace_is_game_started() && phys == 0u) {
++    if (g_fntrace_game_started && phys == 0u) {
+         switch (g_debug_last_store_pc) {
+         case 0xBFC04E90u:   /* ROM, runs in place */
+         case 0xBFC04EF0u:
+@@ -2082,7 +2122,7 @@ static void psx_write_word_raw(uint32_t addr, uint32_t val) {
+                 s_tomb_evcb_protect = (e && e[0] == '1') ? 1 : 0;
+             }
+             if (s_tomb_evcb_protect &&
+-                fntrace_is_game_started() &&
++                g_fntrace_game_started &&
+                 scph1001_relocated_store(0x00001CE4u, 0xBFC117E4u) &&  /* kernel */
+                 val == 0x2000u &&
+                 phys >= 4u && (phys + 8u) < RAM_SIZE &&
+@@ -2101,8 +2141,8 @@ static void psx_write_word_raw(uint32_t addr, uint32_t val) {
+ #ifndef PSX_NO_DEBUG_TOOLS
+         debug_server_trace_write_check(phys, read_ram_word(phys), val, 4);
+ #endif
+-        parity_trace_note_write(phys, 4, effective_store_pc());
+-        card_data_writes_check(phys, val, 4);
++        if (g_parity_trace_armed) parity_trace_note_write(phys, 4, effective_store_pc());
++        if (g_card_data_writes_armed) card_data_writes_check(phys, val, 4);
+         dirty_ram_mark_kernel_write(phys);
+         text_guard_note_write(phys, val, 4);
+         overlay_watch_note_write(phys, 4);
+@@ -2237,8 +2277,8 @@ static void psx_write_half_raw(uint32_t addr, uint16_t val) {
+ #ifndef PSX_NO_DEBUG_TOOLS
+         debug_server_trace_write_check(phys, (uint32_t)read_ram_half(phys), (uint32_t)val, 2);
+ #endif
+-        parity_trace_note_write(phys, 2, effective_store_pc());
+-        card_data_writes_check(phys, (uint32_t)val, 2);
++        if (g_parity_trace_armed) parity_trace_note_write(phys, 2, effective_store_pc());
++        if (g_card_data_writes_armed) card_data_writes_check(phys, (uint32_t)val, 2);
+         dirty_ram_mark_kernel_write(phys);
+         text_guard_note_write(phys, (uint32_t)val, 2);
+         overlay_watch_note_write(phys, 2);
+@@ -2607,8 +2647,8 @@ static void psx_write_byte_raw(uint32_t addr, uint8_t val) {
+ #ifndef PSX_NO_DEBUG_TOOLS
+         debug_server_trace_write_check(phys, (uint32_t)ram[phys], (uint32_t)val, 1);
+ #endif
+-        parity_trace_note_write(phys, 1, effective_store_pc());
+-        card_data_writes_check(phys, (uint32_t)val, 1);
++        if (g_parity_trace_armed) parity_trace_note_write(phys, 1, effective_store_pc());
++        if (g_card_data_writes_armed) card_data_writes_check(phys, (uint32_t)val, 1);
+         dirty_ram_mark_kernel_write(phys);
+         text_guard_note_write(phys, (uint32_t)val, 1);
+         overlay_watch_note_write(phys, 1);
+diff --git a/runtime/src/mod_runtime.cpp b/runtime/src/mod_runtime.cpp
+index c2095254..4cf19096 100644
+--- a/runtime/src/mod_runtime.cpp
++++ b/runtime/src/mod_runtime.cpp
+@@ -71,6 +71,11 @@ extern "C" const char* host_launch_timing_stage_name(uint32_t stage) {
+ #include <unistd.h>
+ #endif
+ 
++/* psx_fastpath.h mirror: 1 once the main-EXE mod plan was applied or rejected
++ * (mod_runtime_on_dispatch then has nothing left to do). */
++extern "C" int g_mod_runtime_main_done;
++int g_mod_runtime_main_done = 0;
++
+ static PSXModDiscRequestProvider g_disc_request_provider;
+ static const PSXRecompV4::ModResolution::Plugin* g_disc_request_owner;
+ 
+@@ -1676,7 +1681,7 @@ bool mod_runtime_initialize(const std::filesystem::path& root,
+     s.effective_disc_path.clear();
+     s.entry_phys = 0;
+     s.initialized = false;
+-    s.main_applied = false;
++    s.main_applied = false; g_mod_runtime_main_done = false;
+     s.disc_enabled = false;
+     s.disc_guard_failed = false;
+     s.manager.set_root(root);
+@@ -1797,7 +1802,7 @@ bool mod_runtime_clear_for_netplay(std::string* error) {
+     s.raw_overlay_index.clear();
+     s.user_overlay_index.clear();
+     s.effective_disc_path.clear();
+-    s.main_applied = false;
++    s.main_applied = false; g_mod_runtime_main_done = false;
+     s.disc_enabled = false;
+     s.disc_guard_failed = false;
+     s.netplay_view_plan = false;
+@@ -2382,7 +2387,7 @@ static bool install_plan(RuntimeMods& s, ModResolution plan,
+         index_timing.success();
+     }
+     s.effective_disc_path = std::move(effective_disc);
+-    s.main_applied = false;
++    s.main_applied = false; g_mod_runtime_main_done = false;
+     s.error.clear();
+ #if defined(PSX_LAUNCHER_MOD_COMMIT_WORKER_SAFE)
+     if (save_selection && (s.provider_preparing || s.cached_prepare) &&
+@@ -2418,7 +2423,7 @@ bool mod_runtime_commit(const std::filesystem::path& disc_path, std::string* err
+         s.derived_disc_storage.clear();
+         s.audio_tracks.clear();
+         s.extent_start = 0;
+-        s.main_applied = false;
++        s.main_applied = false; g_mod_runtime_main_done = false;
+         s.error.clear();
+         psx_mod_counter_add("startup.plan_reuse", 1);
+         timing.success();
+@@ -2837,7 +2842,7 @@ extern "C" void mod_runtime_on_dispatch(uint32_t target) {
+                     "(expected-byte guard failed; booting unmodified)\n",
+                     s.plan.fingerprint.c_str(),
+                     (unsigned)((uint32_t)write.location + (uint32_t)i));
+-                s.main_applied = true;
++                s.main_applied = true; g_mod_runtime_main_done = true;
+                 return;
+             }
+         }
+@@ -2846,7 +2851,7 @@ extern "C" void mod_runtime_on_dispatch(uint32_t target) {
+         if (write.target != ModPatchTarget::MainExe) continue;
+         apply_main_write(write);
+     }
+-    s.main_applied = true;
++    s.main_applied = true; g_mod_runtime_main_done = true;
+     if (!s.plan.writes.empty())
+         std::fprintf(stdout, "psxrecomp: applied mod plan %s\n",
+                      s.plan.fingerprint.c_str());
+@@ -2889,7 +2894,7 @@ extern "C" void mod_runtime_on_savestate_loaded(void) {
+         apply_main_write(write);
+         applied = true;
+     }
+-    s.main_applied = true;
++    s.main_applied = true; g_mod_runtime_main_done = true;
+     for (const ModResolution::Plugin& plugin : s.plan.plugins) {
+         s.current_plugin = &plugin;
+         mod_invoke_savestate_plugin(plugin.id);
+diff --git a/runtime/src/overlay_loader.c b/runtime/src/overlay_loader.c
+index 12430abd..ae5cb00e 100644
+--- a/runtime/src/overlay_loader.c
++++ b/runtime/src/overlay_loader.c
+@@ -24,6 +24,8 @@ static void overlay_cpu_charge(uint32_t cycles) { psx_cpu_charge(cycles); }
+ #include <stdio.h>
+ #include <stdarg.h>
+ #include <ctype.h>
++extern const uint8_t *memory_get_ram_ptr_const(void);   /* read-only RAM view (psx_fastpath.h) */
++extern void dirty_ram_text_gen_bump(void);
+ 
+ extern void overlay_watch_set_range(uint32_t phys, uint32_t len);
+ 
+@@ -574,7 +576,7 @@ extern uint32_t overlay_watch_pagegen_sum(uint32_t phys, uint32_t len);
+  * contiguous live bytes (past the live RAM end) can never validate. */
+ static int ov_ranges_crc(const uint32_t *lo, const uint32_t *len, int n,
+                          uint32_t *crc_out) {
+-    const uint8_t *ram = memory_get_ram_ptr();
++    const uint8_t *ram = memory_get_ram_ptr_const();
+     uint32_t crc = 0xFFFFFFFFu;
+     for (int i = 0; i < n; i++) {
+         uint32_t off = 0;
+@@ -632,6 +634,12 @@ typedef struct {
+ } StaticMatchCache;
+ 
+ static StaticMatchCache s_static_match_cache[STATIC_MATCH_CACHE_CAP];
++/* SM2-Recomp round 4 (2026-11-02): one bit per cache slot that has ever been
++ * filled, so psx_overlay_resident_crc_at() visits only those slots (in the
++ * same ascending order) instead of all 16,384. A never-filled slot has
++ * ranges == NULL and was skipped by the old scan anyway; a slot cleared on
++ * replacement keeps its bit and is skipped by the same test as before. */
++static uint32_t s_static_match_used[STATIC_MATCH_CACHE_CAP / 32u];
+ static uint8_t s_static_match_victim[STATIC_MATCH_CACHE_SETS];
+ 
+ /* Main-RAM offset of a variant code range, through the one geometry contract
+@@ -649,7 +657,7 @@ static uint64_t s_static_match_gen_fastpath = 0;
+ int psx_overlay_static_code_matches(const uint32_t *lo_len_pairs,
+                                     uint32_t count,
+                                     uint32_t expected_crc) {
+-    const uint8_t *ram = memory_get_ram_ptr();
++    const uint8_t *ram = memory_get_ram_ptr_const();
+     if (!ram || !lo_len_pairs || count == 0u || count > 4096u) {
+         s_static_match_crc_misses++;
+         return 0;
+@@ -732,6 +740,10 @@ int psx_overlay_static_code_matches(const uint32_t *lo_len_pairs,
+ 
+     if (entry) {
+         entry->ranges = lo_len_pairs;
++        {
++            const uint32_t used_idx = (uint32_t)(entry - s_static_match_cache);
++            s_static_match_used[used_idx >> 5] |= 1u << (used_idx & 31u);
++        }
+         entry->count = count;
+         entry->expected_crc = expected_crc;
+         entry->gen_sum = gen_sum;
+@@ -768,7 +780,12 @@ uint32_t psx_overlay_resident_crc_at(uint32_t phys, int *valid) {
+         if (valid) *valid = 0;
+         return s_last_crc;
+     }
+-    for (uint32_t i = 0; i < STATIC_MATCH_CACHE_CAP; i++) {
++    for (uint32_t w = 0; w < STATIC_MATCH_CACHE_CAP / 32u; w++) {
++      const uint32_t used_bits = s_static_match_used[w];
++      if (!used_bits) continue;
++      for (uint32_t b = 0; b < 32u; b++) {
++        if (!((used_bits >> b) & 1u)) continue;
++        const uint32_t i = w * 32u + b;
+         const StaticMatchCache *e = &s_static_match_cache[i];
+         if (!e->ranges || phys < e->lo_min || phys >= e->hi_max)
+             continue;
+@@ -785,6 +802,7 @@ uint32_t psx_overlay_resident_crc_at(uint32_t phys, int *valid) {
+             }
+         }
+         if (!stale) stale = e->expected_crc;
++      }
+     }
+     if (valid) *valid = 0;
+     return stale ? stale : s_last_crc;
+@@ -1097,7 +1115,7 @@ static int ranges_contain_word(const uint32_t *lo_list,
+  * delay slot rejects the whole native identity. */
+ static int ranges_delay_slots_hashed(const uint32_t *lo_list,
+                                      const uint32_t *len_list, int n) {
+-    const uint8_t *ram = memory_get_ram_ptr();
++    const uint8_t *ram = memory_get_ram_ptr_const();
+     if (!ram || n < 1 || n > MAX_CODE_RANGES) return 0;
+     for (int r = 0; r < n; r++) {
+         uint32_t lo = lo_list[r] & 0x1FFFFFFFu;   /* code address */
+@@ -3201,6 +3219,7 @@ void overlay_loader_resync_validation_after_restore(void)
+         s_cand[i].val_gen ^= 0x80000000u;
+ #ifdef PSX_HAS_OVERLAY_DISPATCH
+     memset(s_static_match_cache, 0, sizeof(s_static_match_cache));
++    memset(s_static_match_used, 0, sizeof(s_static_match_used));
+     memset(s_static_match_victim, 0, sizeof(s_static_match_victim));
+ #endif
+ }
+@@ -4544,6 +4563,7 @@ static void run_shadow_diff_legacy(CPUState *cpu, Candidate *c, uint32_t addr) {
+ 
+     *cpu = cpu0;
+     memcpy(ram,  s_ram0,  SHADOW_RAM_SIZE);
++    dirty_ram_text_gen_bump();   /* RAM rewritten outside the store path */
+     memcpy(spad, s_spad0, SHADOW_SPAD_SIZE);
+     uint32_t stop_ra = cpu->gpr[31];   /* entry $ra = the function's return point */
+     /* Arm the own-interior native route for the NATIVE pass only (see
+@@ -4651,6 +4671,7 @@ static void run_shadow_diff_legacy(CPUState *cpu, Candidate *c, uint32_t addr) {
+      * spurious in-progress unwind wedges the guest). */
+     *cpu = cpuI;
+     memcpy(ram,  s_ramI,  SHADOW_RAM_SIZE);
++    dirty_ram_text_gen_bump();
+     memcpy(spad, s_spadI, SHADOW_SPAD_SIZE);
+     g_psx_call_bail = 0;
+     s_native_exec  = sv;
+diff --git a/runtime/src/parity_trace.c b/runtime/src/parity_trace.c
+index 3b1692b9..1e75f67d 100644
+--- a/runtime/src/parity_trace.c
++++ b/runtime/src/parity_trace.c
+@@ -11,7 +11,8 @@
+ 
+ static PSX_BSS ParityEntry s_ring[PARITY_RING_CAP];
+ static uint64_t    s_seq      = 0;
+-static uint32_t    s_armed    = 0;
++uint32_t           g_parity_trace_armed = 0;   /* psx_fastpath.h; was static s_armed */
++#define s_armed g_parity_trace_armed
+ static uint32_t    s_frozen   = 0;
+ 
+ static uint32_t    s_watched_tcb   = 0;
+diff --git a/runtime/src/psx_cycles.c b/runtime/src/psx_cycles.c
+index 86528dbe..33013f1b 100644
+--- a/runtime/src/psx_cycles.c
++++ b/runtime/src/psx_cycles.c
+@@ -1,6 +1,7 @@
+ /* psx_cycles.c — PSX guest CPU cycle clock. */
+ 
+ #include "psx_cycles.h"
++#include "psx_idle_state.h"
+ #include "psx_native_idle_wait.h"
+ #include "psx_cycle_freeze.h"
+ #include "cpu_state.h"
+@@ -587,22 +588,21 @@ uint32_t g_idle_skip_last_quantum = 0;
+  * delivery still runs normally. */
+ int g_idle_note_suppress = 0;
+ 
+-static uint32_t s_idle_pc = 0;
+-static uint32_t s_idle_quantum = 0;
+-static uint32_t s_idle_streak = 0;
+-static int      s_idle_have_snap = 0; /* GPR snapshot valid for s_idle_pc */
+-static uint32_t s_idle_gpr[32];
+-static uint32_t s_idle_hi = 0, s_idle_lo = 0;
+-static int      s_idle_progress_reg = -2; /* -2 unknown, -1 stable, 1..31 countdown */
+-static int32_t  s_idle_progress_delta = 0;
+-static uint64_t s_idle_last_cycle = 0;
+-static uint64_t s_idle_last_stores = 0;
+-static uint64_t s_idle_last_mmio = 0;
++/* Detector state (psx_idle_state.h): one struct so interrupts.c can take the
++ * trivial new-PC step inline. Field names keep the former s_idle_* meanings. */
++PsxIdleState g_psx_idle = {
++    .pc = 0, .quantum = 0, .streak = 0, .have_snap = 0,
++    .progress_reg = -2, .progress_delta = 0,
++    .last_cycle = 0, .last_stores = 0, .last_mmio = 0,
++    .edges = 0, .iter_edges = 0, .store_addr = 0xFFFFFFFFu, .store_val = 0,
++    .mem_progress = 0, .site_count = 0, .audited_only = 0,
++    .track = NULL, .track_value = 0, .fast_ready = 0,
++};
+ 
+ static void idle_snapshot_regs(const CPUState *cpu) {
+-    for (int i = 1; i < 32; i++) s_idle_gpr[i] = cpu->gpr[i];
+-    s_idle_hi = cpu->hi;
+-    s_idle_lo = cpu->lo;
++    for (int i = 1; i < 32; i++) g_psx_idle.gpr[i] = cpu->gpr[i];
++    g_psx_idle.hi = cpu->hi;
++    g_psx_idle.lo = cpu->lo;
+ }
+ 
+ static int idle_skip_on(void) {
+@@ -654,36 +654,30 @@ static const uint32_t s_no_store = 0xFFFFFFFFu;
+ static int            *s_track = &s_track_dummy;
+ static const uint32_t *s_last_addr = &s_no_store, *s_last_val = &s_no_store;
+ static void (*s_idle_host_write)(uint32_t addr, uint32_t val) = NULL;
+-void psx_idle_skip_set_host_writer(void (*w)(uint32_t, uint32_t)) { s_idle_host_write = w; }
++void psx_idle_skip_set_host_writer(void (*w)(uint32_t, uint32_t)) { s_idle_host_write = w; g_psx_idle.fast_ready = 0; }
+ void psx_idle_skip_set_store_tracker(int *gate, const uint32_t *addr, const uint32_t *val) {
+     s_track = gate ? gate : &s_track_dummy;
+     s_last_addr = addr ? addr : &s_no_store;
+     s_last_val = val ? val : &s_no_store;
++    g_psx_idle.track = s_track;
++    g_psx_idle.fast_ready = 0;     /* re-latch *track through a full pass */
+ }
+-enum { IDLE_EDGES_MAX = 8, IDLE_SITES_MAX = 16 };
++enum { IDLE_EDGES_MAX = 8, IDLE_SITES_MAX = PSX_IDLE_SITES_MAX };
+ /* Audited sites. The detector proves the loop's shape over the passes it
+  * sees; it cannot prove that no later counter-dependent exit exists (an exit
+  * at counter == 500 would be skipped over). Only sites a developer audited
+  * and declared are eligible. */
+-static uint32_t s_idle_sites[IDLE_SITES_MAX];
+-static int      s_idle_site_count = 0;
+-static int      s_idle_audited_only = 0;
+ void psx_idle_skip_set_store_counter_sites(const uint32_t *pcs, int n) {
+     if (n < 0 || !pcs) n = 0;
+     if (n > IDLE_SITES_MAX) n = IDLE_SITES_MAX;
+-    for (int i = 0; i < n; i++) s_idle_sites[i] = pcs[i];
+-    s_idle_site_count = n;
++    for (int i = 0; i < n; i++) g_psx_idle.sites[i] = pcs[i];
++    g_psx_idle.site_count = n;
+ }
+ static int idle_site_listed(uint32_t pc) {
+-    for (int i = 0; i < s_idle_site_count; i++)
+-        if (s_idle_sites[i] == pc) return 1;
++    for (int i = 0; i < g_psx_idle.site_count; i++)
++        if (g_psx_idle.sites[i] == pc) return 1;
+     return 0;
+ }
+-static uint32_t s_idle_edges = 0;          /* non-anchor edges since the anchor */
+-static uint32_t s_idle_iter_edges = 0;     /* edges in the last whole iteration */
+-static uint32_t s_idle_store_addr = 0xFFFFFFFFu;
+-static uint32_t s_idle_store_val = 0;
+-static int      s_idle_mem_progress = 0;
+ 
+ static int idle_skip_ext_on(void) {
+     if (g_idle_skip_ext < 0) {
+@@ -692,6 +686,8 @@ static int idle_skip_ext_on(void) {
+     }
+     /* Without a host writer the counter cannot be lowered: no extension. */
+     *s_track = g_idle_skip_ext > 0 && s_idle_host_write != NULL && s_track != &s_track_dummy;
++    g_psx_idle.track = s_track;
++    g_psx_idle.track_value = *s_track;
+     return *s_track;
+ }
+ 
+@@ -700,7 +696,7 @@ static int idle_skip_ext_on(void) {
+ static int idle_stores_ok(uint64_t stores_now, int ext, uint32_t *addr, uint32_t *val) {
+     *addr = 0xFFFFFFFFu;
+     *val = 0;
+-    const uint64_t d = stores_now - s_idle_last_stores;
++    const uint64_t d = stores_now - g_psx_idle.last_stores;
+     if (d == 0) return 1;
+     if (!ext || d != 1 || *s_last_addr == 0xFFFFFFFFu) return 0;
+     const uint32_t phys = *s_last_addr & 0x1FFFFFFFu;
+@@ -712,20 +708,20 @@ static int idle_stores_ok(uint64_t stores_now, int ext, uint32_t *addr, uint32_t
+ }
+ 
+ static void idle_reset_progress(void) {
+-    s_idle_streak = 0;
+-    s_idle_quantum = 0;
+-    s_idle_progress_reg = -2;
+-    s_idle_progress_delta = 0;
+-    s_idle_mem_progress = 0;
++    g_psx_idle.streak = 0;
++    g_psx_idle.quantum = 0;
++    g_psx_idle.progress_reg = -2;
++    g_psx_idle.progress_delta = 0;
++    g_psx_idle.mem_progress = 0;
+ }
+ 
+ void psx_idle_skip_set_audited_only(int enabled) {
+-    s_idle_audited_only = enabled != 0;
+-    s_idle_pc = 0;
+-    s_idle_have_snap = 0;
+-    s_idle_edges = 0;
++    g_psx_idle.audited_only = enabled != 0;
++    g_psx_idle.pc = 0;
++    g_psx_idle.have_snap = 0;
++    g_psx_idle.edges = 0;
+     idle_reset_progress();
+-    if (s_idle_audited_only) *s_track = 0;
++    if (g_psx_idle.audited_only) *s_track = 0;
+ }
+ 
+ void psx_idle_note_check(CPUState *cpu, uint32_t check_pc) {
+@@ -742,16 +738,16 @@ void psx_idle_note_check(CPUState *cpu, uint32_t check_pc) {
+     if (g_ls_replay_active) return;
+     if (g_idle_note_suppress) return;
+     if (!idle_skip_on()) {
+-        if (s_idle_audited_only && *s_track) *s_track = 0;
++        if (g_psx_idle.audited_only && *s_track) *s_track = 0;
+         return;
+     }
+     /* Build-declared waits do not train ordinary loops or track every store
+      * through active gameplay. Leave a wait once, then keep this path cheap. */
+-    if (s_idle_audited_only && !idle_site_listed(check_pc)) {
+-        if (s_idle_pc || s_idle_have_snap || s_idle_edges) {
+-            s_idle_pc = 0;
+-            s_idle_have_snap = 0;
+-            s_idle_edges = 0;
++    if (g_psx_idle.audited_only && !idle_site_listed(check_pc)) {
++        if (g_psx_idle.pc || g_psx_idle.have_snap || g_psx_idle.edges) {
++            g_psx_idle.pc = 0;
++            g_psx_idle.have_snap = 0;
++            g_psx_idle.edges = 0;
+             idle_reset_progress();
+         }
+         if (*s_track) *s_track = 0;
+@@ -759,42 +755,48 @@ void psx_idle_note_check(CPUState *cpu, uint32_t check_pc) {
+     }
+     if (check_pc == 0 || psx_get_in_exception() || g_psx_call_bail ||
+         g_precise_mode || g_ls_mode != 0) {
+-        s_idle_pc = 0;
+-        s_idle_streak = 0;
+-        s_idle_have_snap = 0;
+-        s_idle_edges = 0;
+-        if (s_idle_audited_only && *s_track) *s_track = 0;
++        g_psx_idle.pc = 0;
++        g_psx_idle.streak = 0;
++        g_psx_idle.have_snap = 0;
++        g_psx_idle.edges = 0;
++        if (g_psx_idle.audited_only && *s_track) *s_track = 0;
+         return;
+     }
+     /* The extension applies only at an audited site: the anchor while
+      * counting its inner edges, else the PC being checked. */
+-    const uint32_t site = (s_idle_pc != 0 && check_pc != s_idle_pc) ? s_idle_pc : check_pc;
++    const uint32_t site = (g_psx_idle.pc != 0 && check_pc != g_psx_idle.pc) ? g_psx_idle.pc : check_pc;
+     const int ext = idle_skip_ext_on() && idle_site_listed(site);
++    /* From here on the environment is latched and *s_track carries the value
++     * idle_skip_ext_on() writes on every pass: interrupts.c may now take the
++     * trivial new-PC step of this function inline (psx_idle_note_fast_step in
++     * psx_idle_state.h) instead of calling it. Any state-model change below
++     * stays here: the inline step is this function's `else` branch verbatim. */
++    g_psx_idle.fast_ready = 1;
+ 
+     /* Extension: an edge inside the anchor's iteration. Only MMIO is checked
+      * here; stores are counted over the whole iteration at the anchor. */
+-    if (ext && s_idle_pc != 0 && check_pc != s_idle_pc && s_idle_edges < IDLE_EDGES_MAX &&
+-        g_mmio_access_count == s_idle_last_mmio) {
+-        s_idle_edges++;
++    if (ext && g_psx_idle.pc != 0 && check_pc != g_psx_idle.pc && g_psx_idle.edges < IDLE_EDGES_MAX &&
++        g_mmio_access_count == g_psx_idle.last_mmio) {
++        g_psx_idle.edges++;
+         return;
+     }
+ 
+     uint64_t cyc = psx_cycle_count;
+     uint32_t st_addr, st_val;
+     const int stores_ok = idle_stores_ok(g_guest_store_count, ext, &st_addr, &st_val);
+-    if (check_pc == s_idle_pc && s_idle_have_snap && stores_ok &&
+-        g_mmio_access_count == s_idle_last_mmio) {
++    if (check_pc == g_psx_idle.pc && g_psx_idle.have_snap && stores_ok &&
++        g_mmio_access_count == g_psx_idle.last_mmio) {
+         int changed = -1, changed_count = 0;
+         for (int i = 1; i < 32; i++) {
+-            if (cpu->gpr[i] != s_idle_gpr[i]) {
++            if (cpu->gpr[i] != g_psx_idle.gpr[i]) {
+                 changed = i;
+                 changed_count++;
+                 if (changed_count > 1) break;
+             }
+         }
+-        if (cpu->hi != s_idle_hi || cpu->lo != s_idle_lo) changed_count = 2;
++        if (cpu->hi != g_psx_idle.hi || cpu->lo != g_psx_idle.lo) changed_count = 2;
+         int32_t progress_delta = changed_count == 1
+-            ? (int32_t)(cpu->gpr[changed] - s_idle_gpr[changed]) : 0;
++            ? (int32_t)(cpu->gpr[changed] - g_psx_idle.gpr[changed]) : 0;
+         /* Besides the original invariant-register loop, accept exactly one
+          * monotonically decrementing timeout register. Skipped iterations apply
+          * the same decrements and stop before zero so the real exit branch still
+@@ -805,74 +807,76 @@ void psx_idle_note_check(CPUState *cpu, uint32_t check_pc) {
+          * than last iteration, positive; a progressing register must hold it. */
+         int mem_progress = 0;
+         if (st_addr != 0xFFFFFFFFu) {
+-            if (st_addr == s_idle_store_addr && st_val == s_idle_store_val - 1u &&
++            if (st_addr == g_psx_idle.store_addr && st_val == g_psx_idle.store_val - 1u &&
+                 (int32_t)st_val > 1 &&
+                 (progress_reg <= 0 || cpu->gpr[progress_reg] == st_val))
+                 mem_progress = 1;
+             else
+                 progress_reg = -2;
+-        } else if (s_idle_store_addr != 0xFFFFFFFFu) {
++        } else if (g_psx_idle.store_addr != 0xFFFFFFFFu) {
+             progress_reg = -2;              /* the store pattern changed */
+         }
+-        uint32_t quantum = (uint32_t)(cyc - s_idle_last_cycle);
++        uint32_t quantum = (uint32_t)(cyc - g_psx_idle.last_cycle);
+         if (progress_reg != -2 && quantum > 0 && quantum <= IDLE_QUANTUM_MAX) {
+-            if (quantum == s_idle_quantum &&
+-                progress_reg == s_idle_progress_reg &&
+-                progress_delta == s_idle_progress_delta &&
+-                mem_progress == s_idle_mem_progress &&
+-                s_idle_edges == s_idle_iter_edges) {
+-                if (s_idle_streak < 1000000u) s_idle_streak++;
++            if (quantum == g_psx_idle.quantum &&
++                progress_reg == g_psx_idle.progress_reg &&
++                progress_delta == g_psx_idle.progress_delta &&
++                mem_progress == g_psx_idle.mem_progress &&
++                g_psx_idle.edges == g_psx_idle.iter_edges) {
++                if (g_psx_idle.streak < 1000000u) g_psx_idle.streak++;
+             } else {
+-                s_idle_quantum = quantum;
+-                s_idle_progress_reg = progress_reg;
+-                s_idle_progress_delta = progress_delta;
+-                s_idle_mem_progress = mem_progress;
+-                s_idle_streak = 1;
++                g_psx_idle.quantum = quantum;
++                g_psx_idle.progress_reg = progress_reg;
++                g_psx_idle.progress_delta = progress_delta;
++                g_psx_idle.mem_progress = mem_progress;
++                g_psx_idle.streak = 1;
+             }
+         } else {
+             idle_reset_progress();
+         }
+-        s_idle_store_addr = st_addr;
+-        s_idle_store_val = st_val;
+-        s_idle_iter_edges = s_idle_edges;
++        g_psx_idle.store_addr = st_addr;
++        g_psx_idle.store_val = st_val;
++        g_psx_idle.iter_edges = g_psx_idle.edges;
+         idle_snapshot_regs(cpu);
+-    } else if (check_pc == s_idle_pc && stores_ok &&
+-               g_mmio_access_count == s_idle_last_mmio) {
++    } else if (check_pc == g_psx_idle.pc && stores_ok &&
++               g_mmio_access_count == g_psx_idle.last_mmio) {
+         /* Second consecutive observation of this PC with no stores/MMIO —
+          * take the baseline snapshot; the next hit can compare. Defers the
+          * 31-GPR copy away from branchy VLC/decode edges that change resume
+          * PC every check (pure host cost, never skipped). */
+         idle_snapshot_regs(cpu);
+-        s_idle_have_snap = 1;
+-        s_idle_store_addr = st_addr;
+-        s_idle_store_val = st_val;
+-        s_idle_iter_edges = s_idle_edges;
++        g_psx_idle.have_snap = 1;
++        g_psx_idle.store_addr = st_addr;
++        g_psx_idle.store_val = st_val;
++        g_psx_idle.iter_edges = g_psx_idle.edges;
+         idle_reset_progress();
+     } else {
+-        s_idle_pc = check_pc;
++        g_psx_idle.pc = check_pc;
+         idle_reset_progress();
+-        s_idle_have_snap = 0;
+-        s_idle_store_addr = 0xFFFFFFFFu;
++        g_psx_idle.have_snap = 0;
++        g_psx_idle.store_addr = 0xFFFFFFFFu;
+     }
+-    s_idle_edges = 0;
+-    s_idle_last_cycle  = cyc;
+-    s_idle_last_stores = g_guest_store_count;
+-    s_idle_last_mmio   = g_mmio_access_count;
++    g_psx_idle.edges = 0;
++    g_psx_idle.last_cycle  = cyc;
++    g_psx_idle.last_stores = g_guest_store_count;
++    g_psx_idle.last_mmio   = g_mmio_access_count;
+ 
+-    if (s_idle_streak < IDLE_STREAK_MIN) return;
++    if (g_psx_idle.streak < IDLE_STREAK_MIN) return;
+     /* Several edges per pass are accepted only for the store-counter shape
+      * (v_wait). Multi-edge loops with no counter store -- OpenBIOS's
+      * 0xBFC057C0 poll, kernel 0x16BC -- moved R4's boot timing when skipped
+      * (frame 192, cyc +3857), so they keep running for real. */
+-    if (s_idle_iter_edges && !s_idle_mem_progress) return;
+-    uint32_t q = s_idle_quantum;
++    if (g_psx_idle.iter_edges && !g_psx_idle.mem_progress) return;
++    uint32_t q = g_psx_idle.quantum;
+     uint32_t dist = devices_cycles_to_next_idle_event();
+     /* The devices report distances from where they were last serviced
+      * (s_devices_synced_cycle), which can trail psx_cycle_count by a few
+-     * hundred cycles. For the store-counter shape, measure from now: an
+-     * overstated distance lands the skip after the event and delivers the
+-     * IRQ late (R4 boot, frame 961: +402 cycles). */
+-    if (s_idle_iter_edges || s_idle_mem_progress) {
++     * hundred cycles. Measure from now, for every loop shape: an overstated
++     * distance lands the skip after the event and delivers the IRQ late
++     * (R4 boot, frame 961: +402 cycles with the store-counter shape;
++     * Spider-Man 2: Enter Electro boot, frame 589: the VBlank IRQ taken +456
++     * cycles late after a single-edge loop with no stores). */
++    {
+         const uint64_t lag = psx_cycle_count > s_devices_synced_cycle
+             ? psx_cycle_count - s_devices_synced_cycle : 0;
+         if ((uint64_t)dist <= lag) return;
+@@ -880,27 +884,32 @@ void psx_idle_note_check(CPUState *cpu, uint32_t check_pc) {
+     }
+     if (dist <= q) return;               /* one real iteration reaches it */
+     uint32_t k;
+-    if (s_idle_iter_edges == 0)
++    if (g_psx_idle.iter_edges == 0)
+         k = (dist + q - 1u) / q;         /* first check boundary >= event */
+     else
+         k = (dist - 1u) / q;             /* land on the anchor before it */
+-    if (s_idle_progress_reg > 0) {
+-        uint32_t value = cpu->gpr[s_idle_progress_reg];
+-        uint32_t max_k = value > 1u ? value - 1u : 0u;
++    if (g_psx_idle.progress_reg > 0) {
++        /* Signed, like the counter word below: a countdown that leaves the
++         * loop below zero (bgez) reaches its last check at -1, which read
++         * unsigned lifted the cap and skipped the exit pass to the next
++         * device event (Spider-Man 2: Enter Electro SLPM-87073 boot,
++         * frame 285: an 8-pass delay loop ran until the VBlank). */
++        const int32_t value = (int32_t)cpu->gpr[g_psx_idle.progress_reg];
++        const uint32_t max_k = value > 1 ? (uint32_t)value - 1u : 0u;
+         if (k > max_k) k = max_k;
+     }
+-    if (s_idle_mem_progress) {
+-        uint32_t max_k = (int32_t)s_idle_store_val > 1 ? s_idle_store_val - 1u : 0u;
++    if (g_psx_idle.mem_progress) {
++        uint32_t max_k = (int32_t)g_psx_idle.store_val > 1 ? g_psx_idle.store_val - 1u : 0u;
+         if (k > max_k) k = max_k;
+     }
+     if (k == 0) return;
+     uint64_t skip = (uint64_t)k * q;
+     if (skip > IDLE_SKIP_MAX_CYCLES) return;
+ 
+-    if (s_idle_progress_reg > 0)
+-        cpu->gpr[s_idle_progress_reg] -= k;
+-    if (s_idle_mem_progress)
+-        s_idle_host_write(s_idle_store_addr, s_idle_store_val - k);
++    if (g_psx_idle.progress_reg > 0)
++        cpu->gpr[g_psx_idle.progress_reg] -= k;
++    if (g_psx_idle.mem_progress)
++        s_idle_host_write(g_psx_idle.store_addr, g_psx_idle.store_val - k);
+ 
+     g_idle_skip_count++;
+     g_idle_skip_cycles += skip;
+@@ -911,14 +920,14 @@ void psx_idle_note_check(CPUState *cpu, uint32_t check_pc) {
+     /* Device servicing may have written RAM / raised I_STAT — the caller
+      * (psx_check_interrupts) evaluates deliverability right after this with
+      * the post-skip state. Re-detect from scratch either way. */
+-    s_idle_streak = 0;
++    g_psx_idle.streak = 0;
+     idle_snapshot_regs(cpu);
+-    s_idle_have_snap = 1;
+-    s_idle_store_addr = s_idle_mem_progress ? s_idle_store_addr : 0xFFFFFFFFu;
+-    s_idle_store_val = s_idle_store_val - (s_idle_mem_progress ? k : 0u);
+-    s_idle_last_cycle  = psx_cycle_count;
+-    s_idle_last_stores = g_guest_store_count;
+-    s_idle_last_mmio   = g_mmio_access_count;
++    g_psx_idle.have_snap = 1;
++    g_psx_idle.store_addr = g_psx_idle.mem_progress ? g_psx_idle.store_addr : 0xFFFFFFFFu;
++    g_psx_idle.store_val = g_psx_idle.store_val - (g_psx_idle.mem_progress ? k : 0u);
++    g_psx_idle.last_cycle  = psx_cycle_count;
++    g_psx_idle.last_stores = g_guest_store_count;
++    g_psx_idle.last_mmio   = g_mmio_access_count;
+ #endif
+ }
+ 
+@@ -937,14 +946,14 @@ void psx_cycles_resync_after_restore(CPUState *cpu) {
+     psx_in_device_service  = 0;
+     /* Idle-skip detector latches absolute cycle/store counters from the
+      * pre-load timeline; drop them so a rewound clock cannot false-train. */
+-    s_idle_pc = 0;
+-    s_idle_streak = 0;
+-    s_idle_have_snap = 0;
+-    s_idle_progress_reg = -2;
+-    s_idle_edges = 0;
++    g_psx_idle.pc = 0;
++    g_psx_idle.streak = 0;
++    g_psx_idle.have_snap = 0;
++    g_psx_idle.progress_reg = -2;
++    g_psx_idle.edges = 0;
+     idle_reset_progress();
+-    if (s_idle_audited_only) *s_track = 0;
+-    s_idle_last_cycle = psx_cycle_count;
++    if (g_psx_idle.audited_only) *s_track = 0;
++    g_psx_idle.last_cycle = psx_cycle_count;
+     /* GTE/muldiv completion deadlines and load-absorb give-back are host-only
+      * absolute cycle stamps (not in BS_SEC_CPU). After a warm load they still
+      * hold the pre-load live timeline; the next psx_gte_stall / muldiv_stall
+diff --git a/runtime/src/psx_netplay.c b/runtime/src/psx_netplay.c
+index 329dc2f0..ba9ddb59 100644
+--- a/runtime/src/psx_netplay.c
++++ b/runtime/src/psx_netplay.c
+@@ -443,6 +443,7 @@ void psx_start_consumer_note(int slot, uint32_t sim, uint16_t buttons)
+ #if !defined(PSX_HAS_RECOMP_NET)
+ 
+ int  psx_netplay_active(void) { return 0; }
++int  g_psx_netplay_flag = 0;   /* psx_fastpath.h mirror: never active without recomp-net */
+ int  psx_netplay_is_running(void) { return 0; }
+ const char *psx_netplay_transport_name(void) { return "none"; }
+ int  psx_netplay_ice_failed(void) { return 0; }
+@@ -680,6 +681,7 @@ typedef struct {
+ } NetplayState;
+ 
+ static NetplayState g_np;
++int g_psx_netplay_flag = 0;   /* psx_fastpath.h: mirrors g_np.active */
+ 
+ /* Local partition ring aligned with FRAME_COMMIT — explain first core fork. */
+ #define NP_PART_RING 128u
+@@ -4408,6 +4410,7 @@ int psx_netplay_start(const PsxNetplayConfig *cfg)
+      * were on FBO-auth OpenGL (ensure_cpu no-ops once netplay is active). */
+     psx_frontend_netplay_force_sw_gpu();
+     g_np.active = 1;
++    g_psx_netplay_flag = 1;      /* psx_fastpath.h mirror (conservative) */
+     netplay_hc_reset(&g_np.hc);
+     np_part_ring_reset();
+     g_np.rollback = cfg->rollback ? 1 : 0;
+@@ -4748,6 +4751,7 @@ void psx_netplay_shutdown(void)
+         CPUState *saved_cpu = g_np.cpu;
+         memset(&g_np, 0, sizeof(g_np));
+         g_np.cpu = saved_cpu;
++        g_psx_netplay_flag = 0;
+         netplay_hc_reset(&g_np.hc);
+         np_part_ring_reset();
+     }
+diff --git a/runtime/src/psx_selfcheck.c b/runtime/src/psx_selfcheck.c
+index 69cab707..34a0ea8b 100644
+--- a/runtime/src/psx_selfcheck.c
++++ b/runtime/src/psx_selfcheck.c
+@@ -77,7 +77,8 @@ typedef struct {
+     NetplaySioParts  sio;
+ } ScBoundary;
+ 
+-static int       s_phase = SC_OFF;
++int              g_psx_selfcheck_phase = SC_OFF;   /* psx_fastpath.h; was static s_phase */
++#define s_phase g_psx_selfcheck_phase
+ static CPUState *s_cpu;
+ static uint32_t  s_bios_checksum;
+ static uint32_t  s_entry_pc;
+diff --git a/runtime/src/render_pass.c b/runtime/src/render_pass.c
+index 3583b097..64a062f3 100644
+--- a/runtime/src/render_pass.c
++++ b/runtime/src/render_pass.c
+@@ -700,6 +700,7 @@ static void checkpoint_restore(CPUState *cpu) {
+     i_stat = s_ck.i_stat;
+     i_mask = s_ck.i_mask;
+     memcpy(memory_get_ram_ptr(), s_ram_copy, s_ck.ram_bytes);
++    { extern void dirty_ram_text_gen_bump(void); dirty_ram_text_gen_bump(); }   /* RAM rewritten outside the store path */
+     memcpy(memory_get_scratchpad_ptr(), s_ck.spad, RP_SPAD_SIZE);
+     memcpy(g_psx_icache_tv, s_ck.icache, sizeof s_ck.icache);
+     *cpu = s_ck.cpu;
+diff --git a/runtime/src/render_pass_plan.c b/runtime/src/render_pass_plan.c
+index 4795203c..2df51fac 100644
+--- a/runtime/src/render_pass_plan.c
++++ b/runtime/src/render_pass_plan.c
+@@ -258,6 +258,7 @@ int render_pass_store_to(const RenderPassStoreTarget *t, uint32_t addr,
+     if (phys < t->ram_size) {
+         for (uint32_t i = 0; i < width; i++)
+             t->ram[phys + i] = (uint8_t)(val >> (8u * i));
++        { extern void dirty_ram_text_gen_bump(void); dirty_ram_text_gen_bump(); }
+         return -1;
+     }
+     if (phys >= 0x1F800000u && phys < 0x1F800000u + t->scratchpad_size) {
+diff --git a/runtime/src/text_xlate.cpp b/runtime/src/text_xlate.cpp
+index 653c1a07..1667a4a7 100644
+--- a/runtime/src/text_xlate.cpp
++++ b/runtime/src/text_xlate.cpp
+@@ -418,6 +418,15 @@ std::mutex g_mtx;
+ 
+ std::atomic<bool>     g_apply_armed{false};   // table non-empty AND language enabled
+ std::atomic<bool>     g_capture_on{false};    // inventory capture DEFAULT OFF:
++/* psx_fastpath.h mirror: set whenever capture or apply may be armed; the
++ * dispatch hook is then called, and it re-tests the atomics itself. */
++extern "C" int g_text_xlate_armed;
++extern "C" void dirty_ram_text_gen_bump(void);
++int g_text_xlate_armed = 0;
++static void xlate_mirror_armed() {
++    g_text_xlate_armed = (g_capture_on.load(std::memory_order_relaxed) ||
++                          g_apply_armed.load(std::memory_order_relaxed)) ? 1 : 0;
++}
+     // the always-on Shift-JIS string-inventory scan costs 26-35% of
+     // whole-lane throughput on streaming-heavy titles (measured across
+     // three GT2 race lanes; reproduced fleet-wide). Substitution (table +
+@@ -484,7 +493,7 @@ void load_tables_locked() {
+     g_msg_seps.clear();
+     g_msg_sep_pending.store(0, std::memory_order_relaxed);
+     for (auto& kv : g_inv) kv.second.translated = false;
+-    if (g_dir.empty() || !fs::exists(g_dir)) { g_apply_armed.store(false); return; }
++    if (g_dir.empty() || !fs::exists(g_dir)) { g_apply_armed.store(false); xlate_mirror_armed(); return; }
+     const bool lang_off = g_lang.empty() || g_lang == "jp" || g_lang == "off";
+     size_t files = 0, entries = 0, glyphs = 0, vpatches = 0;
+     std::error_code ec;
+@@ -593,6 +602,7 @@ void load_tables_locked() {
+                                       !g_vram_patches.empty() || !g_msg_inplace.empty() ||
+                                       !g_msg_seps.empty()),
+                         std::memory_order_relaxed);
++    xlate_mirror_armed();
+     // Mark inventory records that now have a translation.
+     for (auto& kv : g_inv)
+         kv.second.translated = (g_table.find(kv.first) != g_table.end());
+@@ -835,6 +845,7 @@ extern "C" void text_xlate_on_dispatch(CPUState* cpu, uint32_t target) {
+         (call_n & 0x1FFu) == 0) {
+         std::lock_guard<std::mutex> lk(g_mtx);
+         glyph_labels_patch_locked(ram);
++        dirty_ram_text_gen_bump();   /* RAM patched outside the store path */
+     }
+     // Table-driven message records (never a dispatch arg): patch in place while
+     // any is still unpatched. Same cheap throttle as glyph labels.
+@@ -842,6 +853,7 @@ extern "C" void text_xlate_on_dispatch(CPUState* cpu, uint32_t target) {
+         (call_n & 0x1FFu) == 0) {
+         std::lock_guard<std::mutex> lk(g_mtx);
+         msg_inplace_patch_locked(ram);
++        dirty_ram_text_gen_bump();
+     }
+     // Inter-message NUL separators: same cheap throttle; idle once all placed.
+     if (app && g_msg_sep_pending.load(std::memory_order_relaxed) > 0 &&
+@@ -921,6 +933,7 @@ extern "C" void text_xlate_init(const char* project_root, const char* language)
+     const char* capenv = std::getenv("PSX_XLATE_CAPTURE");
+     if (capenv && capenv[0] == '0') g_capture_on.store(false);
+     else if (capenv && capenv[0] == '1') g_capture_on.store(true);
++    xlate_mirror_armed();
+     std::lock_guard<std::mutex> lk(g_mtx);
+     load_tables_locked();
+ }
+diff --git a/tools/aot_overlay_pipeline.py b/tools/aot_overlay_pipeline.py
+index ee76afe7..32fe3334 100644
+--- a/tools/aot_overlay_pipeline.py
++++ b/tools/aot_overlay_pipeline.py
+@@ -25,7 +25,9 @@ from sector_extent_archive import extract_members as extract_extent_members
+ from aligned_lzss_banks import banks as extract_lzss_banks
+ from indexed_lzss_pack import members as extract_pack_members
+ from mips_tagged_relocations import parse as parse_tagged_relocations, relocate as relocate_tagged_image
+-from counted_mips_relocations import parse as parse_counted_relocations, relocate as relocate_counted_image
++from counted_mips_relocations import (parse as parse_counted_relocations,
++                                      parse_stream as parse_relocation_stream,
++                                      relocate as relocate_counted_image)
+ from mod_package_images import ModPackageView
+ import prepared_files
+ 
+@@ -395,6 +397,8 @@ def spec_sources(disc, spec):
+     method = spec['method']
+     if method == 'counted_relocated_members':
+         return counted_relocated_sources(disc, spec)
++    if method == 'relocated_extent_members':
++        return relocated_extent_sources(disc, spec)
+     if method == 'fixed_address_extents':
+         return extent_sources(disc, spec)
+     if method == 'aligned_lzss_banks':
+@@ -540,6 +544,54 @@ def counted_relocated_sources(disc, spec):
+     return sources
+ 
+ 
++def declared_extent(disc, item, what):
++    """The bytes of a declared {file, file_offset, size, sha256} extent."""
++    data = disc.read(item['file'])
++    offset, size = number(item.get('file_offset', 0)), number(item['size'])
++    require(size > 0 and 0 <= offset and offset + size <= len(data),
++            f"{what} outside source file: {item['file']}")
++    body = data[offset:offset + size]
++    require(hashlib.sha256(body).hexdigest() == item['sha256'],
++            f"{what} bytes changed: {item['file']} {offset:#x}")
++    return body, offset
++
++
++def relocated_extent_sources(disc, spec):
++    """Images whose relocation streams are separate extents, at declared placements.
++
++    An engine can store an image and its two-bit relocation stream apart, for
++    example as two members of an archive. Each member names both extents by
++    file, offset, size and SHA-256, so the archive's own index format stays out
++    of the core. As with counted containers nothing records a destination: each
++    placement must be established from the original loader, and a newly
++    encountered heap placement remains interpreted until a variant is added.
++    """
++    sources = []
++    members = spec['members']
++    require(members, 'Relocated extent members need at least one member')
++    names = [str(item.get('name', '')).strip().upper() for item in members]
++    require(all(names) and len(set(names)) == len(names),
++            'Relocated extent members need unique names')
++    for name, item in zip(names, members):
++        image, image_offset = declared_extent(disc, item['image'], f'{name} image')
++        stream, stream_offset = declared_extent(disc, item['relocations'], f'{name} relocations')
++        member = parse_relocation_stream(image, stream, image_offset, stream_offset)
++        require(len(member.relocations) == number(item['relocation_count']),
++                f'Relocated extent inventory changed: {name}')
++        require(item.get('placements'), f'{name} needs an established placement')
++        bases = [number(p['load_addr']) for p in item['placements']]
++        require(len(bases) == len(set(bases)), f'Duplicate relocated extent placement: {name}')
++        file = item['image']['file'].upper()
++        for placement, base in zip(item['placements'], bases):
++            require(base % 4 == 0 and in_ram(base, len(image)),
++                    f'{name} placement outside RAM: {base:#x}')
++            sources.append(dict(name=f'{name}@{base:08X}', base=base,
++                body=relocate_counted_image(member, base),
++                spec={**spec, **item, **placement, 'allow_missing': True},
++                source_file=file, source_offset=image_offset, aliases=[]))
++    return sources
++
++
+ def match_sources(record, sources):
+     require(not record.get('executed_pcs'), 'Runtime observations cannot be AOT inputs')
+     data = base64.b64decode(record['bytes_b64'], validate=True)
+@@ -701,7 +753,7 @@ def prepare(profile, disc, records, output, views=None):
+             if (lo, hi) == (source['base'], source['base'] + len(source['body'])):
+                 singles[source['name']] = record
+     for source in sources:
+-        if source['spec']['method'] in ('fixed_address_files', 'fixed_address_extents', 'packed_sector_members', 'sector_extent_members', 'aligned_lzss_banks', 'indexed_lzss_members', 'tagged_relocated_files', 'counted_relocated_members') and source['name'] not in singles:
++        if source['spec']['method'] in ('fixed_address_files', 'fixed_address_extents', 'packed_sector_members', 'sector_extent_members', 'aligned_lzss_banks', 'indexed_lzss_members', 'tagged_relocated_files', 'counted_relocated_members', 'relocated_extent_members') and source['name'] not in singles:
+             record = make_fixed_record(source, disc, sources, bool(profile.get('cross_image_call_roots')))
+             singles[source['name']] = record
+             records.append(record)
+diff --git a/tools/counted_mips_relocations.py b/tools/counted_mips_relocations.py
+index 129dce34..ce021da0 100644
+--- a/tools/counted_mips_relocations.py
++++ b/tools/counted_mips_relocations.py
+@@ -4,6 +4,9 @@ A count precedes 12-byte records (image offset, image size, stream offset).
+ Images follow the records; streams follow the sum of image sizes. Offsets are
+ relative to their respective areas. The format has no destination addresses.
+ Callers must establish placement from the original loader before using AOT.
++
++`parse_stream` reads the same stream format when an image and its stream are
++stored apart, for example as two members of an archive.
+ """
+ from dataclasses import dataclass
+ import struct
+@@ -20,6 +23,44 @@ class Member:
+     stream_end: int
+ 
+ 
++def _read_stream(data: bytes, cursor: int, size: int) -> tuple[tuple[Relocation, ...], int]:
++    """Relocations from `cursor` through the terminator, and the offset after it."""
++    written, relocations = set(), []
++    while True:
++        if cursor > len(data) - 4:
++            raise ValueError('Missing relocation terminator')
++        tag, = struct.unpack_from('<I', data, cursor)
++        cursor += 4
++        if tag == 0xffffffff:
++            return tuple(relocations), cursor
++        target, kind, addend = tag & ~3, tag & 3, None
++        if target + 4 > size or target in written:
++            raise ValueError('Invalid or repeated relocation target')
++        written.add(target)
++        if kind == 1:
++            if cursor > len(data) - 4:
++                raise ValueError('Truncated HI16 addend')
++            addend, = struct.unpack_from('<I', data, cursor)
++            cursor += 4
++        relocations.append(Relocation(target, kind, addend))
++
++
++def parse_stream(image: bytes, stream: bytes, image_offset: int = 0,
++                 stream_offset: int = 0) -> Member:
++    """One image whose relocation stream is stored apart from it.
++
++    The stream must be aligned words ending exactly at its terminator. The
++    offsets only record where the caller read the two byte strings."""
++    if len(image) < 4 or len(image) % 4:
++        raise ValueError('Image must be a nonempty multiple of four bytes')
++    if len(stream) < 4 or len(stream) % 4:
++        raise ValueError('Relocation stream must be aligned words with a terminator')
++    relocations, end = _read_stream(stream, 0, len(image))
++    if end != len(stream):
++        raise ValueError('Unaccounted bytes after relocation terminator')
++    return Member(image_offset, bytes(image), relocations, stream_offset, stream_offset + end)
++
++
+ def parse(data: bytes) -> tuple[Member, ...]:
+     if len(data) < 20 or len(data) % 4:
+         raise ValueError('Container must contain aligned records, images and streams')
+@@ -40,28 +81,12 @@ def parse(data: bytes) -> tuple[Member, ...]:
+         cursor = stream_start + stream
+         if stream % 4 or cursor > len(data) - 4:
+             raise ValueError('Invalid relocation stream offset')
+-        start, written, relocations = cursor, set(), []
+-        while True:
+-            if cursor > len(data) - 4:
+-                raise ValueError('Missing relocation terminator')
+-            tag, = struct.unpack_from('<I', data, cursor)
+-            cursor += 4
+-            if tag == 0xffffffff:
+-                break
+-            target, kind, addend = tag & ~3, tag & 3, None
+-            if target + 4 > size or target in written:
+-                raise ValueError('Invalid or repeated relocation target')
+-            written.add(target)
+-            if kind == 1:
+-                if cursor > len(data) - 4:
+-                    raise ValueError('Truncated HI16 addend')
+-                addend, = struct.unpack_from('<I', data, cursor)
+-                cursor += 4
+-            relocations.append(Relocation(target, kind, addend))
++        start = cursor
++        relocations, cursor = _read_stream(data, cursor, size)
+         streams.append((start, cursor))
+         result.append(Member(image_start + offset,
+                              data[image_start + offset:image_start + offset + size],
+-                             tuple(relocations), start, cursor))
++                             relocations, start, cursor))
+     for intervals, message in ((images, 'Image intervals do not partition their area'),
+                                (streams, 'Relocation streams do not partition their area')):
+         intervals.sort()
+diff --git a/tools/tests/test_aot_overlay_pipeline.py b/tools/tests/test_aot_overlay_pipeline.py
+index 96ee6f6d..b74131a3 100644
+--- a/tools/tests/test_aot_overlay_pipeline.py
++++ b/tools/tests/test_aot_overlay_pipeline.py
+@@ -427,6 +427,71 @@ class AotMethodsTest(unittest.TestCase):
+             pipeline.declared_entries({**source, 'spec': {**source['spec'],
+                                      'entry_pointer_offsets': [0]}}, disc)
+ 
++    def relocated_extent_archive(self):
++        # Invented archive: padding, an image, padding, its relocation stream.
++        # The image is a relocated callback pointer followed by a return stub.
++        image = struct.pack('<4I', 8, 0x12345678, 0x03e00008, 0)
++        stream = struct.pack('<2I', 0, 0xffffffff)
++        archive = bytes(0x10) + image + bytes(8) + stream + bytes(4)
++        member = dict(name='module',
++                      image=dict(file='DATA/ARCHIVE.DAT', file_offset='0x10', size=len(image),
++                                 sha256=sha(image)),
++                      relocations=dict(file='DATA/ARCHIVE.DAT', file_offset='0x28',
++                                       size=len(stream), sha256=sha(stream)),
++                      relocation_count=1, entry_pointer_offsets=[0],
++                      placements=[dict(load_addr='0x80101010'), dict(load_addr='0x80102020')])
++        return FakeDisc({'DATA/ARCHIVE.DAT': archive}), archive, member
++
++    def test_relocated_extent_members_at_multiple_heap_placements(self):
++        disc, archive, member = self.relocated_extent_archive()
++        spec = dict(method='relocated_extent_members', members=[member])
++        sources = pipeline.positioned_sources(disc, [spec])
++        self.assertEqual([s['name'] for s in sources], ['MODULE@80101010', 'MODULE@80102020'])
++        self.assertEqual([s['base'] for s in sources], [0x80101010, 0x80102020])
++        self.assertEqual(sources[0]['body'], struct.pack('<4I', 0x80101018, 0x12345678, 0x03e00008, 0))
++        self.assertEqual([(s['source_file'], s['source_offset']) for s in sources],
++                         [('DATA/ARCHIVE.DAT', 0x10)] * 2)
++        self.assertEqual([pipeline.declared_entries(s, disc) for s in sources],
++                         [{0x80101018}, {0x80102028}])
++        self.assertEqual(disc.read('DATA/ARCHIVE.DAT'), archive)
++        with tempfile.TemporaryDirectory() as directory:
++            disc.binary = Path(directory) / 'source.bin'; disc.binary.write_bytes(archive)
++            inventory = pipeline.prepare(dict(game_id='TEST', images=[spec], strict_bounds=True,
++                                              expected_records=2), disc, [], Path(directory))
++        self.assertEqual(inventory['recipe_count'], 2)
++        self.assertEqual([j['required_entries'] for j in inventory['jobs']],
++                         [[0x80101018], [0x80102028]])
++        self.assertEqual(inventory['jobs'][0]['known_ranges'], [(0x80101010, 0x80101020)])
++
++    def test_relocated_extent_sources_reject_drift(self):
++        disc, archive, member = self.relocated_extent_archive()
++
++        def sources(*items):
++            return pipeline.positioned_sources(disc, [dict(method='relocated_extent_members',
++                                                          members=list(items))])
++        image, relocations = member['image'], member['relocations']
++        for change, error in (
++                (dict(image={**image, 'sha256': '0' * 64}), 'image bytes changed'),
++                (dict(relocations={**relocations, 'sha256': '0' * 64}), 'relocations bytes changed'),
++                (dict(image={**image, 'file_offset': hex(len(archive) - 8)}), 'outside source file'),
++                (dict(relocation_count=2), 'inventory changed'),
++                (dict(placements=[]), 'established placement'),
++                (dict(placements=member['placements'] * 2), 'Duplicate'),
++                (dict(placements=[dict(load_addr='0x80101012')]), 'outside RAM'),
++                (dict(placements=[dict(load_addr='0x807ffff8')]), 'outside RAM'),
++                (dict(name=' '), 'unique names')):
++            with self.subTest(change=change), self.assertRaisesRegex(ValueError, error):
++                sources({**member, **change})
++        with self.assertRaisesRegex(ValueError, 'unique names'):
++            sources(member, {**member, 'name': 'MODULE'})
++        with self.assertRaisesRegex(ValueError, 'at least one member'):
++            sources()
++        # A stream with bytes after its terminator is not the declared stream.
++        padded = {**relocations, 'size': relocations['size'] + 4,
++                  'sha256': sha(archive[0x28:0x28 + relocations['size'] + 4])}
++        with self.assertRaisesRegex(ValueError, 'Unaccounted bytes'):
++            sources({**member, 'relocations': padded})
++
+     def test_tagged_relocated_original_file_and_inventory_check(self):
+         original = struct.pack('<8I', 16, 8, 0x03e00008, 0, 4, 0xFFFFFFFF, 0, 0)[:24]
+         disc = FakeDisc({'MODULE.DLL': original})
+diff --git a/tools/tests/test_counted_mips_relocations.py b/tools/tests/test_counted_mips_relocations.py
+index 8ac180b7..f8ee2921 100644
+--- a/tools/tests/test_counted_mips_relocations.py
++++ b/tools/tests/test_counted_mips_relocations.py
+@@ -4,7 +4,7 @@ from pathlib import Path
+ import unittest
+ 
+ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+-from counted_mips_relocations import parse, relocate
++from counted_mips_relocations import parse, parse_stream, relocate
+ 
+ 
+ def container(images, streams):
+@@ -65,6 +65,32 @@ class CountedRelocationsTest(unittest.TestCase):
+             with self.subTest(base=base), self.assertRaises(ValueError):
+                 relocate(member, base)
+ 
++    def test_separate_stream_relocates_like_a_container_member(self):
++        image = struct.pack('<4I', 12, 0x3c080000, 0x25090040, 0x0ffffffe)
++        stream = struct.pack('<6I', 0, 5, 0x7000, 10, 15, 0xffffffff)
++        member = parse_stream(image, stream, image_offset=0x800, stream_offset=0x1000)
++        counted, = parse(container([image], [stream]))
++        self.assertEqual(member.relocations, counted.relocations)
++        self.assertEqual((member.image_offset, member.stream_offset, member.stream_end),
++                         (0x800, 0x1000, 0x1000 + len(stream)))
++        for base in (0x80101234, 0x8010fffc, 0x801fffe0):
++            with self.subTest(base=base):
++                self.assertEqual(relocate(member, base), relocate(counted, base))
++
++    def test_separate_stream_must_be_complete_and_exact(self):
++        image = bytes(8)
++        for stream in (struct.pack('<2I', 0xffffffff, 0),       # bytes after the terminator
++                       struct.pack('<I', 0),                    # no terminator
++                       struct.pack('<I', 1),                    # HI16 without its addend
++                       struct.pack('<2I', 8, 0xffffffff),       # target outside the image
++                       struct.pack('<3I', 0, 0, 0xffffffff),    # repeated target
++                       struct.pack('<I', 0xffffffff)[:3]):      # not whole words
++            with self.subTest(stream=stream), self.assertRaises(ValueError):
++                parse_stream(image, stream)
++        for bad_image in (b'', bytes(6)):
++            with self.subTest(image=bad_image), self.assertRaises(ValueError):
++                parse_stream(bad_image, struct.pack('<I', 0xffffffff))
++
+ 
+ if __name__ == '__main__':
+     unittest.main()

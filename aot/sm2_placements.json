@@ -1,0 +1,1448 @@
+{
+ "schema": "SM2-Recomp placements v1",
+ "note": "Basi di caricamento dei moduli di codice di CD.WAD (.bin + .rel) osservate nella RAM del gioco. Il gioco li carica nell'heap con func_8001E8E4, li riloca con func_8001EEF0 e chiama base+0. Una base vale solo se il modulo rilocato a quella base coincide con la RAM catturata: le basi si trovano con tools/m3_prova/trova_basi.py e si verificano con tools/m3_prova/verifica_ram.py (tools/run_m3_prova.cmd). Altre basi (altri livelli) vanno aggiunte quando osservate: le basi non elencate continuano con la compilazione automatica del runtime.",
+ "versions": {
+  "SLUS-01378-Rev1": {
+   "disc_sha1": "135ccc4b075ac2c348d2240605ed4266a73c0e42",
+   "modules": {
+    "shell": {
+     "placements": [
+      "0x801502F8"
+     ],
+     "evidence": "catture del runtime del 26/10/2026 (build-dev/overlay_captures.json e .d/), primo livello, verificate con tools/m3_prova/verifica_ram.py: 8 catture, 18052/18052 confronti uguali, 9026/21180 parole del modulo viste in RAM (43%), nessuna diversa"
+    },
+    "thug": {
+     "placements": [
+      "0x80151520",
+      "0x8015307C",
+      "0x80153A8C",
+      "0x80153F28",
+      "0x80154000",
+      "0x80154968",
+      "0x801555C8",
+      "0x801556DC",
+      "0x80155A7C",
+      "0x801561B4",
+      "0x8015701C",
+      "0x801599F0",
+      "0x8016EB44",
+      "0x8017CF38",
+      "0x80182758",
+      "0x80184830",
+      "0x8018DFEC",
+      "0x801C2764"
+     ],
+     "evidence": "catture del runtime del 26/10/2026 (build-dev/overlay_captures.json e .d/), primo livello, verificate con tools/m3_prova/verifica_ram.py: 4 catture, 16394/16394 confronti uguali, 10245/14601 parole viste (70%), nessuna diversa; seed del runtime a 0x8018DFEC = base+0; 0x80151520: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 14601/14601; 0x80153A8C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 14601/14601; 0x80153F28: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 14601/14601; 0x80154000: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m3 14589/14601; 0x80154968: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 14601/14601; 0x801555C8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 14601/14601; 0x80155A7C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 14588/14601; 0x801561B4: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 14601/14601; 0x8015701C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m1 14589/14601; 0x801599F0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 14601/14601; 0x80182758: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 14601/14601; 0x80184830: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m1 14601/14601; 0x801C2764: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 14601/14601; 0x8015307C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 14589/14601; 0x801556DC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: xt01 14589/14601; 0x8016EB44: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 14601/14601; 0x8017CF38: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem3 14601/14601"
+    },
+    "xmen": {
+     "placements": [
+      "0x8016F734",
+      "0x801706E0",
+      "0x80170CC8",
+      "0x8018A870",
+      "0x8019E6EC",
+      "0x8019F8CC",
+      "0x801AF300",
+      "0x801CFC1C"
+     ],
+     "evidence": "catture del runtime del 26/10/2026 (build-dev/overlay_captures.json e .d/), primo livello, verificate con tools/m3_prova/verifica_ram.py: 2 catture, 2116/2116 confronti uguali, 1867/1867 parole viste (100%), nessuna diversa; seed del runtime a 0x801CFC1C = base+0; 0x8016F734: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr02 1867/1867; 0x801706E0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr05 1867/1867; 0x80170CC8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 1867/1867; 0x8018A870: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr03 1867/1867; 0x8019E6EC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 1867/1867; 0x8019F8CC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr06 1867/1867; 0x801AF300: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr07 1867/1867"
+    },
+    "chopper": {
+     "placements": [
+      "0x801B0270",
+      "0x801BC714",
+      "0x801D0328"
+     ],
+     "evidence": "0x801B0270: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 2116/2116; 0x801D0328: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 2116/2116; 0x801BC714: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 2116/2116"
+    },
+    "e2m1bomb": {
+     "placements": [
+      "0x8014A318"
+     ],
+     "evidence": "0x8014A318: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 1285/1285"
+    },
+    "e3m0hud": {
+     "placements": [
+      "0x8014743C"
+     ],
+     "evidence": "0x8014743C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 483/483"
+    },
+    "electro": {
+     "placements": [
+      "0x801A6B40"
+     ],
+     "evidence": "0x801A6B40: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 5140/5140"
+    },
+    "hamhead": {
+     "placements": [
+      "0x801A7A68"
+     ],
+     "evidence": "0x801A7A68: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 8232/8232"
+    },
+    "hostage": {
+     "placements": [
+      "0x8014743C"
+     ],
+     "evidence": "0x8014743C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 970/970, e4m1 970/970"
+    },
+    "lizard": {
+     "placements": [
+      "0x80154BCC"
+     ],
+     "evidence": "0x80154BCC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 6809/6809"
+    },
+    "plane": {
+     "placements": [
+      "0x801A8ADC"
+     ],
+     "evidence": "0x801A8ADC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 2646/2646"
+    },
+    "samurai": {
+     "placements": [
+      "0x80156DE0"
+     ],
+     "evidence": "0x80156DE0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3203/3203"
+    },
+    "sandman": {
+     "placements": [
+      "0x80164B60"
+     ],
+     "evidence": "0x80164B60: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 5121/5126"
+    },
+    "sandman2": {
+     "placements": [
+      "0x80154240"
+     ],
+     "evidence": "0x80154240: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 5682/5682"
+    },
+    "selectro": {
+     "placements": [
+      "0x801A14D0"
+     ],
+     "evidence": "0x801A14D0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 6327/6345"
+    },
+    "sentry": {
+     "placements": [
+      "0x80156EB8",
+      "0x80157384",
+      "0x80158750",
+      "0x80158CB0",
+      "0x8018DB60",
+      "0x801A5D70"
+     ],
+     "evidence": "0x80156EB8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 3772/3772; 0x80157384: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 3772/3772; 0x80158750: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 3772/3772; 0x80158CB0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 3772/3772; 0x8018DB60: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 3772/3772; 0x801A5D70: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3772/3772"
+    },
+    "shocker": {
+     "placements": [
+      "0x80194840"
+     ],
+     "evidence": "0x80194840: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 4881/4881"
+    },
+    "smoke": {
+     "placements": [
+      "0x8014743C",
+      "0x80147464"
+     ],
+     "evidence": "0x8014743C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 763/763; 0x80147464: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 763/763"
+    },
+    "specweb": {
+     "placements": [
+      "0x80160864",
+      "0x80161DB0",
+      "0x8016D39C",
+      "0x801867D8",
+      "0x8019817C",
+      "0x8019DCC8",
+      "0x801A0ACC",
+      "0x801A24D4"
+     ],
+     "evidence": "0x80160864: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 5005/5005; 0x80161DB0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 5005/5005; 0x8016D39C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 5005/5005; 0x801867D8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 5005/5005; 0x8019817C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 5005/5005; 0x8019DCC8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 5005/5005; 0x801A0ACC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 5005/5005; 0x801A24D4: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 5005/5005"
+    },
+    "srchlght": {
+     "placements": [
+      "0x801CA95C"
+     ],
+     "evidence": "0x801CA95C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 1537/1537"
+    },
+    "terminal": {
+     "placements": [
+      "0x8015BBD4",
+      "0x8015F4C0",
+      "0x80169E58"
+     ],
+     "evidence": "0x8015BBD4: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 4758/4758; 0x8015F4C0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 4758/4758; 0x80169E58: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 4758/4758"
+    },
+    "thermo": {
+     "placements": [
+      "0x8014743C"
+     ],
+     "evidence": "0x8014743C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 310/310"
+    },
+    "turret": {
+     "placements": [
+      "0x8015CCB8",
+      "0x8015DB00",
+      "0x8019FCCC",
+      "0x801D0F6C"
+     ],
+     "evidence": "0x8015CCB8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 2442/2443; 0x8015DB00: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 2442/2443; 0x8019FCCC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 2438/2443; 0x801D0F6C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 2438/2443"
+    },
+    "waterpmp": {
+     "placements": [
+      "0x8014A968"
+     ],
+     "evidence": "0x8014A968: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 480/480"
+    },
+    "credits": {
+     "placements": [
+      "0x8014743C"
+     ],
+     "evidence": "0x8014743C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: cred 450/450"
+    },
+    "training": {
+     "placements": [
+      "0x8014743C",
+      "0x8014A318"
+     ],
+     "evidence": "0x8014743C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 905/906, tr02 905/906, tr03 905/906, tr05 905/906, tr06 905/906, wr02 905/906, wr05 905/906, xt01 905/906; 0x8014A318: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 905/906, tr07 905/906, wr01 905/906, wr03 905/906, wr04 905/906, wr06 905/906, wr07 905/906"
+    }
+   }
+  },
+  "SLES-03623-Rev1": {
+   "disc_sha1": "4411b3de700fd091c6c7fdb71510e92af5e5542e",
+   "modules": {
+    "chopper": {
+     "placements": [
+      "0x801B0E80",
+      "0x801BD324",
+      "0x801D0F38"
+     ],
+     "evidence": "0x801B0E80: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 2116/2116; 0x801BD324: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 2116/2116; 0x801D0F38: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 2116/2116"
+    },
+    "credits": {
+     "placements": [
+      "0x8014804C"
+     ],
+     "evidence": "0x8014804C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: cred 450/450"
+    },
+    "e2m1bomb": {
+     "placements": [
+      "0x8014AF28"
+     ],
+     "evidence": "0x8014AF28: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 1293/1293"
+    },
+    "e3m0hud": {
+     "placements": [
+      "0x8014804C"
+     ],
+     "evidence": "0x8014804C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 485/485"
+    },
+    "electro": {
+     "placements": [
+      "0x801A7750"
+     ],
+     "evidence": "0x801A7750: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 5139/5139"
+    },
+    "hamhead": {
+     "placements": [
+      "0x801A8678"
+     ],
+     "evidence": "0x801A8678: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 8233/8233"
+    },
+    "hostage": {
+     "placements": [
+      "0x8014804C"
+     ],
+     "evidence": "0x8014804C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 986/986, e4m1 986/986"
+    },
+    "lizard": {
+     "placements": [
+      "0x801557DC"
+     ],
+     "evidence": "0x801557DC: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 6839/6839"
+    },
+    "plane": {
+     "placements": [
+      "0x801A96EC"
+     ],
+     "evidence": "0x801A96EC: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 2662/2662"
+    },
+    "samurai": {
+     "placements": [
+      "0x801579F0"
+     ],
+     "evidence": "0x801579F0: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3222/3222"
+    },
+    "sandman": {
+     "placements": [
+      "0x80165770"
+     ],
+     "evidence": "0x80165770: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 5137/5142"
+    },
+    "sandman2": {
+     "placements": [
+      "0x80154E50"
+     ],
+     "evidence": "0x80154E50: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 5698/5698"
+    },
+    "selectro": {
+     "placements": [
+      "0x801A20E0"
+     ],
+     "evidence": "0x801A20E0: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 6351/6369"
+    },
+    "sentry": {
+     "placements": [
+      "0x80157AC8",
+      "0x80157F94",
+      "0x80159360",
+      "0x801598C0",
+      "0x8018E770",
+      "0x801A6980"
+     ],
+     "evidence": "0x80157AC8: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 3772/3772; 0x80157F94: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 3772/3772; 0x80159360: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 3772/3772; 0x801598C0: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 3772/3772; 0x8018E770: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 3772/3772; 0x801A6980: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3772/3772"
+    },
+    "shocker": {
+     "placements": [
+      "0x80195450"
+     ],
+     "evidence": "0x80195450: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 4897/4897"
+    },
+    "smoke": {
+     "placements": [
+      "0x8014804C",
+      "0x80148074"
+     ],
+     "evidence": "0x8014804C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 778/778; 0x80148074: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 778/778"
+    },
+    "specweb": {
+     "placements": [
+      "0x80161474",
+      "0x801629C0",
+      "0x8016DFAC",
+      "0x801873E8",
+      "0x80198D8C",
+      "0x8019E8D8",
+      "0x801A16DC",
+      "0x801A30E4"
+     ],
+     "evidence": "0x80161474: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 5005/5005; 0x801629C0: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 5005/5005; 0x8016DFAC: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 5005/5005; 0x801873E8: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 5005/5005; 0x80198D8C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 5005/5005; 0x8019E8D8: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 5005/5005; 0x801A16DC: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 5005/5005; 0x801A30E4: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 5005/5005"
+    },
+    "srchlght": {
+     "placements": [
+      "0x801CB56C"
+     ],
+     "evidence": "0x801CB56C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 1537/1537"
+    },
+    "terminal": {
+     "placements": [
+      "0x8015C7E4",
+      "0x801600D0",
+      "0x8016AA68"
+     ],
+     "evidence": "0x8015C7E4: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 4759/4759; 0x801600D0: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 4759/4759; 0x8016AA68: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 4759/4759"
+    },
+    "thermo": {
+     "placements": [
+      "0x8014804C"
+     ],
+     "evidence": "0x8014804C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 321/321"
+    },
+    "thug": {
+     "placements": [
+      "0x80152130",
+      "0x80153C8C",
+      "0x8015469C",
+      "0x80154B38",
+      "0x80154C10",
+      "0x80155578",
+      "0x801561D8",
+      "0x801562EC",
+      "0x8015668C",
+      "0x80156DC4",
+      "0x80157C2C",
+      "0x8015A600",
+      "0x8016F754",
+      "0x8017DB48",
+      "0x80183368",
+      "0x80185440",
+      "0x8018EBFC",
+      "0x801C3374"
+     ],
+     "evidence": "0x80152130: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: dem1 14605/14617, e4m2 14617/14617, tr06 14617/14617, tr07 14617/14617, wr01 14605/14617, wr06 14617/14617, wr07 14617/14617; 0x80153C8C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 14605/14617; 0x8015469C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 14617/14617; 0x80154B38: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 14617/14617; 0x80154C10: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m3 14617/14617; 0x80155578: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 14617/14617; 0x801561D8: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 14617/14617; 0x801562EC: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: xt01 14605/14617; 0x8015668C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 14604/14617; 0x80156DC4: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 14617/14617; 0x80157C2C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m1 14605/14617; 0x8015A600: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 14617/14617; 0x8016F754: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 14617/14617; 0x8017DB48: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: dem3 14617/14617; 0x80183368: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 14617/14617; 0x80185440: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m1 14604/14617; 0x8018EBFC: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 14617/14617; 0x801C3374: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 14617/14617"
+    },
+    "training": {
+     "placements": [
+      "0x8014804C",
+      "0x8014AF28"
+     ],
+     "evidence": "0x8014804C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 905/906, tr02 905/906, tr03 905/906, tr05 905/906, tr06 905/906, wr02 905/906, wr05 905/906, xt01 905/906; 0x8014AF28: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 905/906, tr07 905/906, wr01 905/906, wr03 905/906, wr04 905/906, wr06 905/906, wr07 905/906"
+    },
+    "turret": {
+     "placements": [
+      "0x8015D8C8",
+      "0x8015E710",
+      "0x801A08DC",
+      "0x801D1B7C"
+     ],
+     "evidence": "0x8015D8C8: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 2453/2454; 0x8015E710: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 2453/2454; 0x801A08DC: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 2449/2454; 0x801D1B7C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 2449/2454"
+    },
+    "waterpmp": {
+     "placements": [
+      "0x8014B578"
+     ],
+     "evidence": "0x8014B578: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 480/480"
+    },
+    "xmen": {
+     "placements": [
+      "0x80170344",
+      "0x801712F0",
+      "0x801718D8",
+      "0x8018B480",
+      "0x8019F2FC",
+      "0x801A04DC",
+      "0x801AFF10",
+      "0x801D082C"
+     ],
+     "evidence": "0x80170344: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr02 1888/1888; 0x801712F0: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr05 1888/1888; 0x801718D8: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 1888/1888; 0x8018B480: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr03 1888/1888; 0x8019F2FC: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 1888/1888; 0x801A04DC: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr06 1888/1888; 0x801AFF10: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: tr07 1888/1888; 0x801D082C: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 1888/1888"
+    },
+    "shell": {
+     "placements": [
+      "0x80150F08"
+     ],
+     "evidence": "0x80150F08: basi_livelli.py (lista dei moduli in RAM a 0x800C2984, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 (menu) 21192/21192"
+    }
+   }
+  },
+  "SLUS-01378": {
+   "disc_sha1": "7108099b8ea82475cdce6491f97972b0da4a9ef2",
+   "modules": {
+    "chopper": {
+     "placements": [
+      "0x801B0278",
+      "0x801BBDF8",
+      "0x801D0330"
+     ],
+     "evidence": "0x801B0278: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 2116/2116; 0x801BBDF8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 2116/2116; 0x801D0330: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 2116/2116"
+    },
+    "credits": {
+     "placements": [
+      "0x80147444"
+     ],
+     "evidence": "0x80147444: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: cred 448/448"
+    },
+    "e2m1bomb": {
+     "placements": [
+      "0x8014A320"
+     ],
+     "evidence": "0x8014A320: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 1266/1266"
+    },
+    "e3m0hud": {
+     "placements": [
+      "0x80147444"
+     ],
+     "evidence": "0x80147444: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 483/483"
+    },
+    "electro": {
+     "placements": [
+      "0x801A6B48"
+     ],
+     "evidence": "0x801A6B48: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 5140/5140"
+    },
+    "hamhead": {
+     "placements": [
+      "0x801A7A70"
+     ],
+     "evidence": "0x801A7A70: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 8232/8232"
+    },
+    "hostage": {
+     "placements": [
+      "0x80147444"
+     ],
+     "evidence": "0x80147444: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 970/970, e4m1 970/970"
+    },
+    "lizard": {
+     "placements": [
+      "0x80154BD4"
+     ],
+     "evidence": "0x80154BD4: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 6809/6809"
+    },
+    "plane": {
+     "placements": [
+      "0x801A8B70"
+     ],
+     "evidence": "0x801A8B70: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 2646/2646"
+    },
+    "samurai": {
+     "placements": [
+      "0x80156E18"
+     ],
+     "evidence": "0x80156E18: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3203/3203"
+    },
+    "sandman": {
+     "placements": [
+      "0x80164B68"
+     ],
+     "evidence": "0x80164B68: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 5121/5126"
+    },
+    "sandman2": {
+     "placements": [
+      "0x80154248"
+     ],
+     "evidence": "0x80154248: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 5682/5682"
+    },
+    "selectro": {
+     "placements": [
+      "0x801A1D9C"
+     ],
+     "evidence": "0x801A1D9C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 6327/6345"
+    },
+    "sentry": {
+     "placements": [
+      "0x80156EC0",
+      "0x8015738C",
+      "0x80158758",
+      "0x80158CB8",
+      "0x8018E42C",
+      "0x801A5DA8"
+     ],
+     "evidence": "0x80156EC0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 3772/3772; 0x8015738C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 3772/3772; 0x80158758: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 3772/3772; 0x80158CB8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 3772/3772; 0x8018E42C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 3772/3772; 0x801A5DA8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3772/3772"
+    },
+    "shell": {
+     "placements": [
+      "0x80150300"
+     ],
+     "evidence": "0x80150300: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: cred (menu) 21165/21165, dem1 (menu) 21165/21165, dem2 (menu) 21165/21165, dem3 (menu) 21165/21165, e1m0 (menu) 21165/21165, e1m1 (menu) 21165/21165, e1m2 (menu) 21165/21165, e1m3 (menu) 21165/21165, e1m4 (menu) 21165/21165, e2m1 (menu) 21165/21165, e2m2 (menu) 21165/21165, e2m3 (menu) 21165/21165, e3m0 (menu) 21165/21165, e3m1 (menu) 21165/21165, e3m2 (menu) 21165/21165, e3m3 (menu) 21165/21165, e4m1 (menu) 21165/21165, e4m2 (menu) 21165/21165, e5m1 (menu) 21165/21165, e5m2 (menu) 21165/21165, e5m3 (menu) 21165/21165, e5m4 (menu) 21165/21165, e5m5 (menu) 21165/21165, e5m6 (menu) 21165/21165, e6m1 (menu) 21165/21165, e6m2 (menu) 21165/21165, e6m3 (menu) 21165/21165, e6m4 (menu) 21165/21165, e6m5 (menu) 21165/21165, tr01 (menu) 21165/21165, tr02 (menu) 21165/21165, tr03 (menu) 21165/21165, tr04 (menu) 21165/21165, tr05 (menu) 21165/21165, tr06 (menu) 21165/21165, tr07 (menu) 21165/21165, wr01 (menu) 21165/21165, wr02 (menu) 21165/21165, wr03 (menu) 21165/21165, wr04 (menu) 21165/21165, wr05 (menu) 21165/21165, wr06 (menu) 21165/21165, wr07 (menu) 21165/21165, xt01 (menu) 21165/21165"
+    },
+    "shocker": {
+     "placements": [
+      "0x80194848"
+     ],
+     "evidence": "0x80194848: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 4881/4881"
+    },
+    "smoke": {
+     "placements": [
+      "0x80147444",
+      "0x8014746C"
+     ],
+     "evidence": "0x80147444: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 763/763; 0x8014746C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 763/763"
+    },
+    "specweb": {
+     "placements": [
+      "0x8016086C",
+      "0x80161DB8",
+      "0x8016D3A4",
+      "0x801867E0",
+      "0x80198184",
+      "0x8019DD00",
+      "0x801A0AD4",
+      "0x801A2638"
+     ],
+     "evidence": "0x8016086C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 5005/5005; 0x80161DB8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 5005/5005; 0x8016D3A4: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 5005/5005; 0x801867E0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 5005/5005; 0x80198184: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 5005/5005; 0x8019DD00: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 5005/5005; 0x801A0AD4: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 5005/5005; 0x801A2638: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 5005/5005"
+    },
+    "srchlght": {
+     "placements": [
+      "0x801CA964"
+     ],
+     "evidence": "0x801CA964: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 1537/1537"
+    },
+    "terminal": {
+     "placements": [
+      "0x8015BBDC",
+      "0x8015F4C8",
+      "0x80169E60"
+     ],
+     "evidence": "0x8015BBDC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 4758/4758; 0x8015F4C8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 4758/4758; 0x80169E60: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 4758/4758"
+    },
+    "thermo": {
+     "placements": [
+      "0x80147444"
+     ],
+     "evidence": "0x80147444: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 310/310"
+    },
+    "thug": {
+     "placements": [
+      "0x80151528",
+      "0x80153084",
+      "0x80153BD4",
+      "0x80153F30",
+      "0x80154008",
+      "0x80154970",
+      "0x801555D0",
+      "0x80155A84",
+      "0x80156174",
+      "0x801561BC",
+      "0x80157028",
+      "0x801598EC",
+      "0x8016E228",
+      "0x8017CF40",
+      "0x80182760",
+      "0x80184834",
+      "0x8018DFA8",
+      "0x801C276C"
+     ],
+     "evidence": "0x80151528: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem1 14589/14601, e4m2 14601/14601, tr06 14601/14601, tr07 14601/14601, wr01 14589/14601, wr06 14601/14601, wr07 14601/14601; 0x80153084: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 14589/14601; 0x80153BD4: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 14601/14601; 0x80153F30: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 14601/14601; 0x80154008: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m3 14601/14601; 0x80154970: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 14601/14601; 0x801555D0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 14601/14601; 0x80155A84: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 14601/14601; 0x80156174: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: xt01 14589/14601; 0x801561BC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 14601/14601; 0x80157028: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m1 14589/14601; 0x801598EC: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 14601/14601; 0x8016E228: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 14601/14601; 0x8017CF40: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem3 14601/14601; 0x80182760: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 14601/14601; 0x80184834: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m1 14588/14601; 0x8018DFA8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 14601/14601; 0x801C276C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 14601/14601"
+    },
+    "training": {
+     "placements": [
+      "0x80147444",
+      "0x8014A320"
+     ],
+     "evidence": "0x80147444: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 905/906, tr02 905/906, tr03 905/906, tr05 905/906, tr06 905/906, wr02 905/906, wr05 905/906, xt01 905/906; 0x8014A320: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 905/906, tr07 905/906, wr01 905/906, wr03 905/906, wr04 905/906, wr06 905/906, wr07 905/906"
+    },
+    "turret": {
+     "placements": [
+      "0x8015CCC0",
+      "0x8015DB08",
+      "0x8019FE30",
+      "0x801D0F74"
+     ],
+     "evidence": "0x8015CCC0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 2442/2443; 0x8015DB08: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 2442/2443; 0x8019FE30: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 2438/2443; 0x801D0F74: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 2438/2443"
+    },
+    "waterpmp": {
+     "placements": [
+      "0x8014A970"
+     ],
+     "evidence": "0x8014A970: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 480/480"
+    },
+    "xmen": {
+     "placements": [
+      "0x8016F73C",
+      "0x801706E8",
+      "0x80170CD0",
+      "0x8018A878",
+      "0x8019E6F4",
+      "0x8019F8D4",
+      "0x801AF308",
+      "0x801CFBD8"
+     ],
+     "evidence": "0x8016F73C: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr02 1867/1867; 0x801706E8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr05 1867/1867; 0x80170CD0: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 1867/1867; 0x8018A878: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr03 1867/1867; 0x8019E6F4: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 1867/1867; 0x8019F8D4: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr06 1867/1867; 0x801AF308: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr07 1867/1867; 0x801CFBD8: basi_livelli.py (lista dei moduli in RAM a 0x800C1D74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 1867/1867"
+    }
+   }
+  },
+  "SLES-03623": {
+   "disc_sha1": "26423253d82f75a7a460e3f2570cbe527e041737",
+   "modules": {
+    "chopper": {
+     "placements": [
+      "0x801B0478",
+      "0x801BBFF8",
+      "0x801D0530"
+     ],
+     "evidence": "0x801B0478: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 2116/2116; 0x801BBFF8: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 2116/2116; 0x801D0530: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 2116/2116"
+    },
+    "credits": {
+     "placements": [
+      "0x80147644"
+     ],
+     "evidence": "0x80147644: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: cred 448/448"
+    },
+    "e2m1bomb": {
+     "placements": [
+      "0x8014A520"
+     ],
+     "evidence": "0x8014A520: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 1266/1266"
+    },
+    "e3m0hud": {
+     "placements": [
+      "0x80147644"
+     ],
+     "evidence": "0x80147644: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 483/483"
+    },
+    "electro": {
+     "placements": [
+      "0x801A6D48"
+     ],
+     "evidence": "0x801A6D48: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 5140/5140"
+    },
+    "hamhead": {
+     "placements": [
+      "0x801A7C70"
+     ],
+     "evidence": "0x801A7C70: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 8232/8232"
+    },
+    "hostage": {
+     "placements": [
+      "0x80147644"
+     ],
+     "evidence": "0x80147644: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 970/970, e4m1 970/970"
+    },
+    "lizard": {
+     "placements": [
+      "0x80154DD4"
+     ],
+     "evidence": "0x80154DD4: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 6809/6809"
+    },
+    "plane": {
+     "placements": [
+      "0x801A8D70"
+     ],
+     "evidence": "0x801A8D70: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 2646/2646"
+    },
+    "samurai": {
+     "placements": [
+      "0x80157018"
+     ],
+     "evidence": "0x80157018: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3203/3203"
+    },
+    "sandman": {
+     "placements": [
+      "0x80164D68"
+     ],
+     "evidence": "0x80164D68: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 5121/5126"
+    },
+    "sandman2": {
+     "placements": [
+      "0x80154448"
+     ],
+     "evidence": "0x80154448: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 5682/5682"
+    },
+    "sentry": {
+     "placements": [
+      "0x801570C0",
+      "0x8015758C",
+      "0x80158958",
+      "0x80158EB8",
+      "0x8018E62C",
+      "0x801A5FA8"
+     ],
+     "evidence": "0x801570C0: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 3772/3772; 0x8015758C: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 3772/3772; 0x80158958: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 3772/3772; 0x80158EB8: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 3772/3772; 0x801A5FA8: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3772/3772; 0x8018E62C: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 (anticipato) 3772/3772"
+    },
+    "shell": {
+     "placements": [
+      "0x80150500"
+     ],
+     "evidence": "0x80150500: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: cred (menu) 21161/21161, dem1 (menu) 21161/21161, dem2 (menu) 21161/21161, dem3 (menu) 21161/21161, e1m0 (menu) 21161/21161, e1m1 (menu) 21161/21161, e1m2 (menu) 21161/21161, e1m3 (menu) 21161/21161, e1m4 (menu) 21161/21161, e2m1 (menu) 21161/21161, e2m2 (menu) 21161/21161, e2m3 (menu) 21161/21161, e3m0 (menu) 21161/21161, e3m1 (menu) 21161/21161, e3m2 (menu) 21161/21161, e3m3 (menu) 21161/21161, e4m1 (menu) 21161/21161, e4m2 (menu) 21161/21161, e5m1 (menu) 21161/21161, e5m2 (menu) 21161/21161, e5m3 (menu) 21161/21161, e5m4 (menu) 21161/21161, e5m5 (menu) 21161/21161, e5m6 (menu) 21161/21161, e6m1 (menu) 21161/21161, e6m2 (menu) 21161/21161, e6m3 (menu) 21161/21161, e6m4 (menu) 21161/21161, e6m5 (menu) 21161/21161, tr01 (menu) 21161/21161, tr02 (menu) 21161/21161, tr03 (menu) 21161/21161, tr04 (menu) 21161/21161, tr05 (menu) 21161/21161, tr06 (menu) 21161/21161, tr07 (menu) 21161/21161, wr01 (menu) 21161/21161, wr02 (menu) 21161/21161, wr03 (menu) 21161/21161, wr04 (menu) 21161/21161, wr05 (menu) 21161/21161, wr06 (menu) 21161/21161, wr07 (menu) 21161/21161, xt01 (menu) 21161/21161"
+    },
+    "shocker": {
+     "placements": [
+      "0x80194A48"
+     ],
+     "evidence": "0x80194A48: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 4881/4881"
+    },
+    "smoke": {
+     "placements": [
+      "0x80147644",
+      "0x8014766C"
+     ],
+     "evidence": "0x80147644: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 763/763; 0x8014766C: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 763/763"
+    },
+    "specweb": {
+     "placements": [
+      "0x80160A6C",
+      "0x80161FB8",
+      "0x8016D5A4",
+      "0x801869E0",
+      "0x80198384",
+      "0x8019DF00",
+      "0x801A0CD4",
+      "0x801A2838"
+     ],
+     "evidence": "0x80160A6C: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 5005/5005; 0x80161FB8: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 5005/5005; 0x8016D5A4: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 5005/5005; 0x801869E0: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 5005/5005; 0x80198384: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 5005/5005; 0x8019DF00: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 5005/5005; 0x801A0CD4: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 5005/5005; 0x801A2838: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 5005/5005"
+    },
+    "srchlght": {
+     "placements": [
+      "0x801CAB64"
+     ],
+     "evidence": "0x801CAB64: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 1537/1537"
+    },
+    "terminal": {
+     "placements": [
+      "0x8015BDDC",
+      "0x8015F6C8",
+      "0x8016A060"
+     ],
+     "evidence": "0x8015BDDC: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 4758/4758; 0x8015F6C8: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 4758/4758; 0x8016A060: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 4758/4758"
+    },
+    "thermo": {
+     "placements": [
+      "0x80147644"
+     ],
+     "evidence": "0x80147644: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 310/310"
+    },
+    "thug": {
+     "placements": [
+      "0x80151728",
+      "0x80153284",
+      "0x80153DD4",
+      "0x80154130",
+      "0x80154208",
+      "0x80154B70",
+      "0x801557D0",
+      "0x80155C84",
+      "0x80156374",
+      "0x801563BC",
+      "0x80157228",
+      "0x80159AEC",
+      "0x8016E428",
+      "0x8017D140",
+      "0x80182960",
+      "0x80184A34",
+      "0x8018E1A8",
+      "0x801C296C"
+     ],
+     "evidence": "0x80151728: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem1 14589/14601, e4m2 14601/14601, tr06 14601/14601, tr07 14601/14601, wr01 14589/14601, wr06 14601/14601, wr07 14601/14601; 0x80153284: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 14589/14601; 0x80153DD4: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 14601/14601; 0x80154130: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 14601/14601; 0x80154208: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m3 14589/14601; 0x80154B70: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 14601/14601; 0x801557D0: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 14601/14601; 0x80155C84: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 14601/14601; 0x80156374: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: xt01 14601/14601; 0x801563BC: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 14601/14601; 0x80157228: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m1 14589/14601; 0x80159AEC: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 14601/14601; 0x8016E428: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 14601/14601; 0x8017D140: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: dem3 14601/14601; 0x80182960: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 14601/14601; 0x80184A34: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m1 14588/14601; 0x8018E1A8: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 14601/14601; 0x801C296C: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 14601/14601"
+    },
+    "training": {
+     "placements": [
+      "0x80147644",
+      "0x8014A520"
+     ],
+     "evidence": "0x80147644: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 905/906, tr02 905/906, tr03 905/906, tr05 905/906, tr06 905/906, wr02 905/906, wr05 905/906, xt01 905/906; 0x8014A520: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 905/906, tr07 905/906, wr01 905/906, wr03 905/906, wr04 905/906, wr06 905/906, wr07 905/906"
+    },
+    "turret": {
+     "placements": [
+      "0x8015CEC0",
+      "0x8015DD08",
+      "0x801A0030",
+      "0x801D1174"
+     ],
+     "evidence": "0x8015CEC0: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 2442/2443; 0x8015DD08: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 2442/2443; 0x801A0030: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 2438/2443; 0x801D1174: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 2438/2443"
+    },
+    "waterpmp": {
+     "placements": [
+      "0x8014AB70"
+     ],
+     "evidence": "0x8014AB70: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 480/480"
+    },
+    "xmen": {
+     "placements": [
+      "0x8016F93C",
+      "0x801708E8",
+      "0x80170ED0",
+      "0x8018AA78",
+      "0x8019E8F4",
+      "0x8019FAD4",
+      "0x801AF508",
+      "0x801CFDD8"
+     ],
+     "evidence": "0x8016F93C: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr02 1867/1867; 0x801708E8: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr05 1867/1867; 0x80170ED0: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 1867/1867; 0x8018AA78: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr03 1867/1867; 0x8019E8F4: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 1867/1867; 0x8019FAD4: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr06 1867/1867; 0x801AF508: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: tr07 1867/1867; 0x801CFDD8: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 1867/1867"
+    },
+    "selectro": {
+     "placements": [
+      "0x801A1F9C"
+     ],
+     "evidence": "0x801A1F9C: basi_livelli.py (lista dei moduli in RAM a 0x800C1F74, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 (anticipato) 6327/6345"
+    }
+   }
+  },
+  "SLES-03624": {
+   "disc_sha1": "c97f87913c3ee3221dab408ebadfe5c5811af02b",
+   "modules": {
+    "chopper": {
+     "placements": [
+      "0x801B1128",
+      "0x801BD5CC",
+      "0x801D11E0"
+     ],
+     "evidence": "0x801B1128: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 2116/2116; 0x801BD5CC: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 2116/2116; 0x801D11E0: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 2116/2116"
+    },
+    "credits": {
+     "placements": [
+      "0x801482F4"
+     ],
+     "evidence": "0x801482F4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: cred 450/450"
+    },
+    "e2m1bomb": {
+     "placements": [
+      "0x8014B1D0"
+     ],
+     "evidence": "0x8014B1D0: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 1293/1293"
+    },
+    "e3m0hud": {
+     "placements": [
+      "0x801482F4"
+     ],
+     "evidence": "0x801482F4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 485/485"
+    },
+    "electro": {
+     "placements": [
+      "0x801A79F8"
+     ],
+     "evidence": "0x801A79F8: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 5139/5139"
+    },
+    "hamhead": {
+     "placements": [
+      "0x801A8920"
+     ],
+     "evidence": "0x801A8920: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 8233/8233"
+    },
+    "hostage": {
+     "placements": [
+      "0x801482F4"
+     ],
+     "evidence": "0x801482F4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 986/986, e4m1 986/986"
+    },
+    "lizard": {
+     "placements": [
+      "0x80155A84"
+     ],
+     "evidence": "0x80155A84: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 6839/6839"
+    },
+    "plane": {
+     "placements": [
+      "0x801A9994"
+     ],
+     "evidence": "0x801A9994: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 2662/2662"
+    },
+    "samurai": {
+     "placements": [
+      "0x80157C98"
+     ],
+     "evidence": "0x80157C98: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3222/3222"
+    },
+    "sandman": {
+     "placements": [
+      "0x80165A18"
+     ],
+     "evidence": "0x80165A18: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 5137/5142"
+    },
+    "sandman2": {
+     "placements": [
+      "0x801550F8"
+     ],
+     "evidence": "0x801550F8: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 5698/5698"
+    },
+    "selectro": {
+     "placements": [
+      "0x801A2388"
+     ],
+     "evidence": "0x801A2388: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 6351/6369"
+    },
+    "sentry": {
+     "placements": [
+      "0x80157D70",
+      "0x8015823C",
+      "0x80159608",
+      "0x80159B68",
+      "0x8018EA18",
+      "0x801A6C28"
+     ],
+     "evidence": "0x80157D70: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 3772/3772; 0x8015823C: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 3772/3772; 0x80159608: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 3772/3772; 0x80159B68: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 3772/3772; 0x8018EA18: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 3772/3772; 0x801A6C28: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3772/3772"
+    },
+    "shell": {
+     "placements": [
+      "0x801511B0"
+     ],
+     "evidence": "0x801511B0: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: cred (menu) 21281/21281, dem1 (menu) 21281/21281, dem2 (menu) 21281/21281, dem3 (menu) 21281/21281, e1m0 (menu) 21281/21281, e1m1 (menu) 21281/21281, e1m2 (menu) 21281/21281, e1m3 (menu) 21281/21281, e1m4 (menu) 21281/21281, e2m1 (menu) 21281/21281, e2m2 (menu) 21281/21281, e2m3 (menu) 21281/21281, e3m0 (menu) 21281/21281, e3m1 (menu) 21281/21281, e3m2 (menu) 21281/21281, e3m3 (menu) 21281/21281, e4m1 (menu) 21281/21281, e4m2 (menu) 21281/21281, e5m1 (menu) 21281/21281, e5m2 (menu) 21281/21281, e5m3 (menu) 21281/21281, e5m4 (menu) 21281/21281, e5m5 (menu) 21281/21281, e5m6 (menu) 21281/21281, e6m1 (menu) 21281/21281, e6m2 (menu) 21281/21281, e6m3 (menu) 21281/21281, e6m4 (menu) 21281/21281, e6m5 (menu) 21281/21281, tr01 (menu) 21281/21281, tr02 (menu) 21281/21281, tr03 (menu) 21281/21281, tr04 (menu) 21281/21281, tr05 (menu) 21281/21281, tr06 (menu) 21281/21281, tr07 (menu) 21281/21281, wr01 (menu) 21281/21281, wr02 (menu) 21281/21281, wr03 (menu) 21281/21281, wr04 (menu) 21281/21281, wr05 (menu) 21281/21281, wr06 (menu) 21281/21281, wr07 (menu) 21281/21281, xt01 (menu) 21281/21281"
+    },
+    "shocker": {
+     "placements": [
+      "0x801956F8"
+     ],
+     "evidence": "0x801956F8: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 4897/4897"
+    },
+    "smoke": {
+     "placements": [
+      "0x801482F4",
+      "0x8014831C"
+     ],
+     "evidence": "0x801482F4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 778/778; 0x8014831C: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 778/778"
+    },
+    "specweb": {
+     "placements": [
+      "0x8016171C",
+      "0x80162C68",
+      "0x8016E254",
+      "0x80187690",
+      "0x80199034",
+      "0x8019EB80",
+      "0x801A1984",
+      "0x801A338C"
+     ],
+     "evidence": "0x8016171C: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 5005/5005; 0x80162C68: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 5005/5005; 0x8016E254: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 5005/5005; 0x80187690: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 5005/5005; 0x80199034: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 5005/5005; 0x8019EB80: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 5005/5005; 0x801A1984: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 5005/5005; 0x801A338C: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 5005/5005"
+    },
+    "srchlght": {
+     "placements": [
+      "0x801CB814"
+     ],
+     "evidence": "0x801CB814: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 1537/1537"
+    },
+    "terminal": {
+     "placements": [
+      "0x8015CA8C",
+      "0x80160378",
+      "0x8016AD10"
+     ],
+     "evidence": "0x8015CA8C: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 4759/4759; 0x80160378: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 4759/4759; 0x8016AD10: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 4759/4759"
+    },
+    "thermo": {
+     "placements": [
+      "0x801482F4"
+     ],
+     "evidence": "0x801482F4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 321/321"
+    },
+    "thug": {
+     "placements": [
+      "0x801523D8",
+      "0x80153F34",
+      "0x80154944",
+      "0x80154DE0",
+      "0x80154EB8",
+      "0x80155820",
+      "0x80156480",
+      "0x80156594",
+      "0x80156934",
+      "0x8015706C",
+      "0x80157ED4",
+      "0x8015A8A8",
+      "0x8016F9FC",
+      "0x8017DDF0",
+      "0x80183610",
+      "0x801856E8",
+      "0x8018EEA4",
+      "0x801C361C"
+     ],
+     "evidence": "0x801523D8: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: dem1 14605/14617, e4m2 14617/14617, tr06 14617/14617, tr07 14617/14617, wr01 14605/14617, wr06 14617/14617, wr07 14617/14617; 0x80153F34: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 (anticipato) 14617/14617; 0x80154944: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 14617/14617; 0x80154DE0: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 14617/14617; 0x80154EB8: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m3 14617/14617; 0x80155820: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 14617/14617; 0x80156480: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 14617/14617; 0x80156594: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: xt01 14605/14617; 0x80156934: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 14604/14617; 0x8015706C: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 14617/14617; 0x80157ED4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m1 14605/14617; 0x8015A8A8: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 14617/14617; 0x8016F9FC: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 14617/14617; 0x8017DDF0: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: dem3 14617/14617; 0x80183610: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 14617/14617; 0x801856E8: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m1 14604/14617; 0x8018EEA4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 14617/14617; 0x801C361C: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 14617/14617"
+    },
+    "training": {
+     "placements": [
+      "0x801482F4",
+      "0x8014B1D0"
+     ],
+     "evidence": "0x801482F4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 912/913, tr02 912/913, tr03 912/913, tr05 912/913, tr06 912/913, wr02 912/913, wr05 912/913, xt01 912/913; 0x8014B1D0: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 912/913, tr07 912/913, wr01 912/913, wr03 912/913, wr04 912/913, wr06 912/913, wr07 912/913"
+    },
+    "turret": {
+     "placements": [
+      "0x8015DB70",
+      "0x8015E9B8",
+      "0x801A0B84",
+      "0x801D1E24"
+     ],
+     "evidence": "0x8015DB70: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 2453/2454; 0x8015E9B8: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 2453/2454; 0x801A0B84: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 2449/2454; 0x801D1E24: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 2449/2454"
+    },
+    "waterpmp": {
+     "placements": [
+      "0x8014B820"
+     ],
+     "evidence": "0x8014B820: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 480/480"
+    },
+    "xmen": {
+     "placements": [
+      "0x801705EC",
+      "0x80171598",
+      "0x80171B80",
+      "0x8018B728",
+      "0x8019F5A4",
+      "0x801A0784",
+      "0x801B01B8",
+      "0x801D0AD4"
+     ],
+     "evidence": "0x801705EC: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr02 1888/1888; 0x80171598: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr05 1888/1888; 0x80171B80: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 1888/1888; 0x8018B728: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr03 1888/1888; 0x8019F5A4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 1888/1888; 0x801A0784: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr06 1888/1888; 0x801B01B8: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: tr07 1888/1888; 0x801D0AD4: basi_livelli.py (lista dei moduli in RAM a 0x800C2C34, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 1888/1888"
+    }
+   }
+  },
+  "SLES-03625": {
+   "disc_sha1": "1d7ccb672001ed8a018e59c41326fa4d80150b26",
+   "modules": {
+    "chopper": {
+     "placements": [
+      "0x801B0F5C",
+      "0x801BD400",
+      "0x801D1014"
+     ],
+     "evidence": "0x801B0F5C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 2116/2116; 0x801BD400: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 2116/2116; 0x801D1014: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 2116/2116"
+    },
+    "credits": {
+     "placements": [
+      "0x80148128"
+     ],
+     "evidence": "0x80148128: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: cred 450/450"
+    },
+    "e2m1bomb": {
+     "placements": [
+      "0x8014B004"
+     ],
+     "evidence": "0x8014B004: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 1293/1293"
+    },
+    "e3m0hud": {
+     "placements": [
+      "0x80148128"
+     ],
+     "evidence": "0x80148128: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 485/485"
+    },
+    "electro": {
+     "placements": [
+      "0x801A782C"
+     ],
+     "evidence": "0x801A782C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 5139/5139"
+    },
+    "hamhead": {
+     "placements": [
+      "0x801A8754"
+     ],
+     "evidence": "0x801A8754: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 8233/8233"
+    },
+    "hostage": {
+     "placements": [
+      "0x80148128"
+     ],
+     "evidence": "0x80148128: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 986/986, e4m1 986/986"
+    },
+    "lizard": {
+     "placements": [
+      "0x801558B8"
+     ],
+     "evidence": "0x801558B8: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 6839/6839"
+    },
+    "plane": {
+     "placements": [
+      "0x801A97C8"
+     ],
+     "evidence": "0x801A97C8: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 2662/2662"
+    },
+    "samurai": {
+     "placements": [
+      "0x80157ACC"
+     ],
+     "evidence": "0x80157ACC: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3222/3222"
+    },
+    "sandman": {
+     "placements": [
+      "0x8016584C"
+     ],
+     "evidence": "0x8016584C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 5137/5142"
+    },
+    "sandman2": {
+     "placements": [
+      "0x80154F2C"
+     ],
+     "evidence": "0x80154F2C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 5698/5698"
+    },
+    "selectro": {
+     "placements": [
+      "0x801A21BC"
+     ],
+     "evidence": "0x801A21BC: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 6351/6369"
+    },
+    "sentry": {
+     "placements": [
+      "0x80157BA4",
+      "0x80158070",
+      "0x8015943C",
+      "0x8015999C",
+      "0x8018E84C",
+      "0x801A6A5C"
+     ],
+     "evidence": "0x80157BA4: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 3772/3772; 0x80158070: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 3772/3772; 0x8015943C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 3772/3772; 0x8015999C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 3772/3772; 0x8018E84C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 3772/3772; 0x801A6A5C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3772/3772"
+    },
+    "shell": {
+     "placements": [
+      "0x80150FE4"
+     ],
+     "evidence": "0x80150FE4: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: cred (menu) 21202/21202, dem1 (menu) 21202/21202, dem2 (menu) 21202/21202, dem3 (menu) 21202/21202, e1m0 (menu) 21202/21202, e1m1 (menu) 21202/21202, e1m2 (menu) 21202/21202, e1m3 (menu) 21202/21202, e1m4 (menu) 21202/21202, e2m1 (menu) 21202/21202, e2m2 (menu) 21202/21202, e2m3 (menu) 21202/21202, e3m0 (menu) 21202/21202, e3m1 (menu) 21202/21202, e3m2 (menu) 21202/21202, e3m3 (menu) 21202/21202, e4m1 (menu) 21202/21202, e4m2 (menu) 21202/21202, e5m1 (menu) 21202/21202, e5m2 (menu) 21202/21202, e5m3 (menu) 21202/21202, e5m4 (menu) 21202/21202, e5m5 (menu) 21202/21202, e5m6 (menu) 21202/21202, e6m1 (menu) 21202/21202, e6m2 (menu) 21202/21202, e6m3 (menu) 21202/21202, e6m4 (menu) 21202/21202, e6m5 (menu) 21202/21202, tr01 (menu) 21202/21202, tr02 (menu) 21202/21202, tr03 (menu) 21202/21202, tr04 (menu) 21202/21202, tr05 (menu) 21202/21202, tr06 (menu) 21202/21202, tr07 (menu) 21202/21202, wr01 (menu) 21202/21202, wr02 (menu) 21202/21202, wr03 (menu) 21202/21202, wr04 (menu) 21202/21202, wr05 (menu) 21202/21202, wr06 (menu) 21202/21202, wr07 (menu) 21202/21202, xt01 (menu) 21202/21202"
+    },
+    "shocker": {
+     "placements": [
+      "0x8019552C"
+     ],
+     "evidence": "0x8019552C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 4897/4897"
+    },
+    "smoke": {
+     "placements": [
+      "0x80148128",
+      "0x80148150"
+     ],
+     "evidence": "0x80148128: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 778/778; 0x80148150: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 778/778"
+    },
+    "specweb": {
+     "placements": [
+      "0x80161550",
+      "0x80162A9C",
+      "0x8016E088",
+      "0x801874C4",
+      "0x80198E68",
+      "0x8019E9B4",
+      "0x801A17B8",
+      "0x801A31C0"
+     ],
+     "evidence": "0x80161550: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 5005/5005; 0x80162A9C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 5005/5005; 0x8016E088: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 5005/5005; 0x801874C4: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 5005/5005; 0x80198E68: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 5005/5005; 0x8019E9B4: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 5005/5005; 0x801A17B8: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 5005/5005; 0x801A31C0: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 5005/5005"
+    },
+    "srchlght": {
+     "placements": [
+      "0x801CB648"
+     ],
+     "evidence": "0x801CB648: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 1537/1537"
+    },
+    "terminal": {
+     "placements": [
+      "0x8015C8C0",
+      "0x801601AC",
+      "0x8016AB44"
+     ],
+     "evidence": "0x8015C8C0: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 4759/4759; 0x801601AC: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 4759/4759; 0x8016AB44: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 4759/4759"
+    },
+    "thermo": {
+     "placements": [
+      "0x80148128"
+     ],
+     "evidence": "0x80148128: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 321/321"
+    },
+    "thug": {
+     "placements": [
+      "0x8015220C",
+      "0x80153D68",
+      "0x80154778",
+      "0x80154C14",
+      "0x80154CEC",
+      "0x80155654",
+      "0x801562B4",
+      "0x801563C8",
+      "0x80156768",
+      "0x80156EA0",
+      "0x80157D08",
+      "0x8015A6DC",
+      "0x8016F830",
+      "0x8017DC24",
+      "0x80183444",
+      "0x8018551C",
+      "0x8018ECD8",
+      "0x801C3450"
+     ],
+     "evidence": "0x8015220C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: dem1 14605/14617, e4m2 14617/14617, tr06 14617/14617, tr07 14617/14617, wr01 14605/14617, wr06 14617/14617, wr07 14617/14617; 0x80153D68: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 14605/14617; 0x80154778: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 14617/14617; 0x80154C14: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 14617/14617; 0x80154CEC: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m3 14617/14617; 0x80155654: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 14617/14617; 0x801562B4: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 14617/14617; 0x801563C8: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: xt01 14605/14617; 0x80156768: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 14604/14617; 0x80156EA0: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 14617/14617; 0x80157D08: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m1 14605/14617; 0x8015A6DC: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 14617/14617; 0x8016F830: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 14617/14617; 0x8017DC24: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: dem3 14617/14617; 0x80183444: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 14617/14617; 0x8018551C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m1 14604/14617; 0x8018ECD8: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 14617/14617; 0x801C3450: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 14617/14617"
+    },
+    "training": {
+     "placements": [
+      "0x80148128",
+      "0x8014B004"
+     ],
+     "evidence": "0x80148128: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 901/902, tr02 901/902, tr03 901/902, tr05 901/902, tr06 901/902, wr02 901/902, wr05 901/902, xt01 901/902; 0x8014B004: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 901/902, tr07 901/902, wr01 901/902, wr03 901/902, wr04 901/902, wr06 901/902, wr07 901/902"
+    },
+    "turret": {
+     "placements": [
+      "0x8015D9A4",
+      "0x8015E7EC",
+      "0x801A09B8",
+      "0x801D1C58"
+     ],
+     "evidence": "0x8015D9A4: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 2453/2454; 0x8015E7EC: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 2453/2454; 0x801A09B8: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 2449/2454; 0x801D1C58: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 2449/2454"
+    },
+    "waterpmp": {
+     "placements": [
+      "0x8014B654"
+     ],
+     "evidence": "0x8014B654: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 480/480"
+    },
+    "xmen": {
+     "placements": [
+      "0x80170420",
+      "0x801713CC",
+      "0x801719B4",
+      "0x8018B55C",
+      "0x8019F3D8",
+      "0x801A05B8",
+      "0x801AFFEC",
+      "0x801D0908"
+     ],
+     "evidence": "0x80170420: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr02 1888/1888; 0x801713CC: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr05 1888/1888; 0x801719B4: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 1888/1888; 0x8018B55C: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr03 1888/1888; 0x8019F3D8: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 1888/1888; 0x801A05B8: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr06 1888/1888; 0x801AFFEC: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: tr07 1888/1888; 0x801D0908: basi_livelli.py (lista dei moduli in RAM a 0x800C2A68, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 1888/1888"
+    }
+   }
+  },
+  "SLPM-87073": {
+   "disc_sha1": "d4a3e8e651f4aa96c777c2a00c281be527b871a9",
+   "modules": {
+    "chopper": {
+     "placements": [
+      "0x801B1D90",
+      "0x801BE234",
+      "0x801D1E48"
+     ],
+     "evidence": "0x801B1D90: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 2117/2117; 0x801BE234: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 2117/2117; 0x801D1E48: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 2117/2117"
+    },
+    "credits": {
+     "placements": [
+      "0x80148F5C"
+     ],
+     "evidence": "0x80148F5C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: cred 437/437"
+    },
+    "e2m1bomb": {
+     "placements": [
+      "0x8014BE38"
+     ],
+     "evidence": "0x8014BE38: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 1273/1273"
+    },
+    "e3m0hud": {
+     "placements": [
+      "0x80148F5C"
+     ],
+     "evidence": "0x80148F5C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 479/479"
+    },
+    "electro": {
+     "placements": [
+      "0x801A8660"
+     ],
+     "evidence": "0x801A8660: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 5087/5087"
+    },
+    "hamhead": {
+     "placements": [
+      "0x801A9588"
+     ],
+     "evidence": "0x801A9588: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m2 8280/8280"
+    },
+    "hostage": {
+     "placements": [
+      "0x80148F5C"
+     ],
+     "evidence": "0x80148F5C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 972/972, e4m1 972/972"
+    },
+    "lizard": {
+     "placements": [
+      "0x801566EC"
+     ],
+     "evidence": "0x801566EC: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 6779/6779"
+    },
+    "plane": {
+     "placements": [
+      "0x801AA5FC"
+     ],
+     "evidence": "0x801AA5FC: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m3 2628/2628"
+    },
+    "samurai": {
+     "placements": [
+      "0x80158900"
+     ],
+     "evidence": "0x80158900: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3209/3209"
+    },
+    "sandman": {
+     "placements": [
+      "0x80166680"
+     ],
+     "evidence": "0x80166680: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 (anticipato) 5090/5095"
+    },
+    "sandman2": {
+     "placements": [
+      "0x80155D60"
+     ],
+     "evidence": "0x80155D60: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 5667/5667"
+    },
+    "selectro": {
+     "placements": [
+      "0x801A2FF0"
+     ],
+     "evidence": "0x801A2FF0: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 6329/6347"
+    },
+    "sentry": {
+     "placements": [
+      "0x801589D8",
+      "0x80158EA4",
+      "0x8015A270",
+      "0x8015A7D0",
+      "0x8018F680",
+      "0x801A7890"
+     ],
+     "evidence": "0x801589D8: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 3779/3779; 0x80158EA4: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 3779/3779; 0x8015A270: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 3779/3779; 0x8015A7D0: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 3779/3779; 0x8018F680: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m4 3779/3779; 0x801A7890: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 3779/3779"
+    },
+    "shell": {
+     "placements": [
+      "0x80151E18"
+     ],
+     "evidence": "0x80151E18: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: cred (menu) 21682/21682, dem1 (menu) 21682/21682, dem2 (menu) 21682/21682, dem3 (menu) 21682/21682, e1m0 (menu) 21682/21682, e1m1 (menu) 21682/21682, e1m2 (menu) 21682/21682, e1m3 (menu) 21682/21682, e1m4 (menu) 21682/21682, e2m1 (menu) 21682/21682, e2m2 (menu) 21682/21682, e2m3 (menu) 21682/21682, e3m0 (menu) 21682/21682, e3m1 (menu) 21682/21682, e3m2 (menu) 21682/21682, e3m3 (menu) 21682/21682, e4m1 (menu) 21682/21682, e4m2 (menu) 21682/21682, e5m1 (menu) 21682/21682, e5m2 (menu) 21682/21682, e5m3 (menu) 21682/21682, e5m4 (menu) 21682/21682, e5m5 (menu) 21682/21682, e5m6 (menu) 21682/21682, e6m1 (menu) 21682/21682, e6m2 (menu) 21682/21682, e6m3 (menu) 21682/21682, e6m4 (menu) 21682/21682, e6m5 (menu) 21682/21682, tr01 (menu) 21682/21682, tr02 (menu) 21682/21682, tr03 (menu) 21682/21682, tr04 (menu) 21682/21682, tr05 (menu) 21682/21682, tr06 (menu) 21682/21682, tr07 (menu) 21682/21682, wr01 (menu) 21682/21682, wr02 (menu) 21682/21682, wr03 (menu) 21682/21682, wr04 (menu) 21682/21682, wr05 (menu) 21682/21682, wr06 (menu) 21682/21682, wr07 (menu) 21682/21682, xt01 (menu) 21682/21682"
+    },
+    "shocker": {
+     "placements": [
+      "0x80196360"
+     ],
+     "evidence": "0x80196360: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 4866/4866"
+    },
+    "smoke": {
+     "placements": [
+      "0x80148F5C",
+      "0x80148F84"
+     ],
+     "evidence": "0x80148F5C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 764/764; 0x80148F84: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 764/764"
+    },
+    "specweb": {
+     "placements": [
+      "0x80162384",
+      "0x801638D0",
+      "0x8016EEBC",
+      "0x801882F8",
+      "0x80199C9C",
+      "0x8019F7E8",
+      "0x801A25EC",
+      "0x801A3FF4"
+     ],
+     "evidence": "0x80162384: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m3 5073/5073; 0x801638D0: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 5073/5073; 0x8016EEBC: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 5073/5073; 0x801882F8: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 5073/5073; 0x80199C9C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 5073/5073; 0x8019F7E8: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m1 5073/5073; 0x801A25EC: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 5073/5073; 0x801A3FF4: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 5073/5073"
+    },
+    "srchlght": {
+     "placements": [
+      "0x801CC47C"
+     ],
+     "evidence": "0x801CC47C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 1537/1537"
+    },
+    "terminal": {
+     "placements": [
+      "0x8015D6F4",
+      "0x80160FE0",
+      "0x8016B978"
+     ],
+     "evidence": "0x8015D6F4: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m4 4844/4844; 0x80160FE0: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 4844/4844; 0x8016B978: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m1 4844/4844"
+    },
+    "thermo": {
+     "placements": [
+      "0x80148F5C"
+     ],
+     "evidence": "0x80148F5C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 308/308"
+    },
+    "thug": {
+     "placements": [
+      "0x80153040",
+      "0x80154B9C",
+      "0x801555AC",
+      "0x80155A48",
+      "0x80155B20",
+      "0x80156488",
+      "0x801570E8",
+      "0x801571FC",
+      "0x8015759C",
+      "0x80157CD4",
+      "0x80158B3C",
+      "0x8015B510",
+      "0x80170664",
+      "0x8017EA58",
+      "0x80184278",
+      "0x80186350",
+      "0x8018FB0C",
+      "0x801C4284"
+     ],
+     "evidence": "0x80153040: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: dem1 14704/14704, e4m2 14704/14704, tr06 14704/14704, tr07 14704/14704, wr01 14692/14704, wr06 14692/14704, wr07 14704/14704; 0x80154B9C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 14704/14704; 0x801555AC: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 14704/14704; 0x80155A48: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e6m3 14704/14704; 0x80155B20: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m3 14704/14704; 0x80156488: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m4 14704/14704; 0x801570E8: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m1 14704/14704; 0x801571FC: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: xt01 14692/14704; 0x8015759C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m2 14691/14704; 0x80157CD4: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m3 (anticipato) 14704/14704; 0x80158B3C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m1 14692/14704; 0x8015B510: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m1 14691/14704; 0x80170664: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: dem2 14691/14704; 0x8017EA58: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: dem3 14691/14704; 0x80184278: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e3m0 14691/14704; 0x80186350: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e4m1 14704/14704; 0x8018FB0C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 14704/14704; 0x801C4284: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 14704/14704"
+    },
+    "training": {
+     "placements": [
+      "0x80148F5C",
+      "0x8014BE38"
+     ],
+     "evidence": "0x80148F5C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 929/930, tr02 929/930, tr03 929/930, tr05 929/930, tr06 929/930, wr02 929/930, wr05 929/930, xt01 929/930; 0x8014BE38: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 929/930, tr07 929/930, wr01 929/930, wr03 929/930, wr04 929/930, wr06 929/930, wr07 929/930"
+    },
+    "turret": {
+     "placements": [
+      "0x8015E7D8",
+      "0x8015F620",
+      "0x801A17EC",
+      "0x801D2A8C"
+     ],
+     "evidence": "0x8015E7D8: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m2 2440/2441; 0x8015F620: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m5 2440/2441; 0x801A17EC: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e2m2 2436/2441; 0x801D2A8C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m2 2436/2441"
+    },
+    "waterpmp": {
+     "placements": [
+      "0x8014C488"
+     ],
+     "evidence": "0x8014C488: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e5m6 488/488"
+    },
+    "xmen": {
+     "placements": [
+      "0x80171254",
+      "0x80172200",
+      "0x801727E8",
+      "0x8018C390",
+      "0x801A020C",
+      "0x801A13EC",
+      "0x801B0E20",
+      "0x801D173C"
+     ],
+     "evidence": "0x80171254: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr02 1866/1866; 0x80172200: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr05 1866/1866; 0x801727E8: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr04 1866/1866; 0x8018C390: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr03 1866/1866; 0x801A020C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr01 1866/1866; 0x801A13EC: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr06 1866/1866; 0x801B0E20: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: tr07 1866/1866; 0x801D173C: basi_livelli.py (lista dei moduli in RAM a 0x800C3878, livello avviato con NEW GAME), RAM = modulo rilocato in: e1m0 1853/1866"
+    }
+   }
+  }
+ }
+}

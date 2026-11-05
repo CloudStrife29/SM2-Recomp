@@ -1,0 +1,25 @@
+# Dati del gioco: mai nel repository / Game data: never in the repository
+input/
+giochi/
+saves/
+cache/
+work/
+dist/
+build*/
+generated/
+disc/
+.cache/
+*.bin
+*.cue
+*.img
+*.ccd
+*.sub
+*.iso
+*.chd
+# filmati e componenti IA (0.12) / AI movies and components (0.12)
+tools/ia/
+*.onnx
+*.pth
+# strumenti di compilazione (nel pacchetto) / build tools (in the package)
+tools/toolchain/
+__pycache__/

@@ -1,0 +1,1602 @@
+{
+ "schema": "SM2-Recomp versioni v1",
+ "note": "Catalogo delle 7 versioni di Spider-Man 2: Enter Electro (PS1) per tools/sm2_launcher.py. Solo fatti (nomi, dimensioni e hash): nessun byte del gioco. La versione si riconosce dallo SHA-1 dell'eseguibile di avvio (quello indicato da SYSTEM.CNF). 'redump' serve solo a dire se il dump e' integro; 'dump_basi_sha1' e' lo SHA-1 del file della traccia dati del dump su cui sono state osservate le basi di aot/sm2_placements.json. 'moduli': i moduli di CD.WAD che hanno basi note, con gli hash delle immagini (.bin) e delle rilocazioni (.rel): il launcher compila in anticipo un modulo solo se nel disco dell'utente e' identico a questo.",
+ "versioni": {
+  "SLUS-01378-Rev1": {
+   "seriale": "SLUS-01378",
+   "exe": "SLUS_013.78",
+   "nome": "USA Rev 1",
+   "lingua": "inglese",
+   "video": "NTSC",
+   "build": "2001-09-28",
+   "conferma": "croce",
+   "exe_sha1": "593b9cfa7cf1ac3cf2051cb5d2af5634a3f1b0d3",
+   "redump": [
+    {
+     "sha1": "135ccc4b075ac2c348d2240605ed4266a73c0e42",
+     "ambito": "immagine",
+     "nome": "Spider-Man 2 - Enter - Electro (USA) (Rev 1)"
+    }
+   ],
+   "dump_basi_sha1": "135ccc4b075ac2c348d2240605ed4266a73c0e42",
+   "moduli": {
+    "chopper": {
+     "bin_sha256": "5d362e1e0ccb9504523ea8bcb6ab35e5b4df2a4f90c864189f8d4f6c15a6b93b",
+     "bin_size": 8464,
+     "rel_sha256": "2e23f861c9e8336c605a13df397c12a947cab560a1fa8bfe8bccf3b822689e5d",
+     "rel_size": 592,
+     "rilocazioni": 138,
+     "basi": 3
+    },
+    "credits": {
+     "bin_sha256": "265c02cfcc641ada858d8d5148d961f0d937e047e017e103d4258b4c91f8e4ed",
+     "bin_size": 1800,
+     "rel_sha256": "5c8543e42c9de57d77ce59fff3be279948421871931b600c847cf414341f5366",
+     "rel_size": 92,
+     "rilocazioni": 17,
+     "basi": 1
+    },
+    "e2m1bomb": {
+     "bin_sha256": "3e0afda265f3f699808a4390dff9a3a61af497d057869fe50853155edee31e0e",
+     "bin_size": 5140,
+     "rel_sha256": "567099e30bdda6794bb877faa0c66da9198bfe0c6db1ffd8d475fcbc69d9395e",
+     "rel_size": 440,
+     "rilocazioni": 88,
+     "basi": 1
+    },
+    "e3m0hud": {
+     "bin_sha256": "335e6defdc2857937ec884f86615163bf9854e56f6ea1fbbaa541c3a2319adc9",
+     "bin_size": 1932,
+     "rel_sha256": "059a0f45a95c58d98c66fd741aed218921798581cd0002b66c60a980d4cfc0c4",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "electro": {
+     "bin_sha256": "278911f69e18ce90d66970a5865308dd8285c2e4222273c439d1152179f23019",
+     "bin_size": 20560,
+     "rel_sha256": "0e95b093166879768783feec71f80474f55aab53f5dfa6bf741585b2a559a729",
+     "rel_size": 1164,
+     "rilocazioni": 262,
+     "basi": 1
+    },
+    "hamhead": {
+     "bin_sha256": "3de3394b15700d58a732383fd96bf3e21088647385f040b8db0484ec504bb917",
+     "bin_size": 32928,
+     "rel_sha256": "bd07d9520a7a0aa6ffd12aec1645ac2c9cbda8df87d0edbda6b05a0489363926",
+     "rel_size": 3064,
+     "rilocazioni": 741,
+     "basi": 1
+    },
+    "hostage": {
+     "bin_sha256": "159b6fb3618b235e1319b2fea0c7a16ffaca33e9315d99cf47a2d53de5a79d8b",
+     "bin_size": 3880,
+     "rel_sha256": "a0d8a84b61c9677e34dc74629d7d7715f2e6f803cae051d4366d6797b479ce9a",
+     "rel_size": 312,
+     "rilocazioni": 69,
+     "basi": 1
+    },
+    "lizard": {
+     "bin_sha256": "77feb4b6fa7e0a9e83d01dd96ef19947c68921fa91752588c477ca21f2bef27a",
+     "bin_size": 27236,
+     "rel_sha256": "5c3d42fa9696e117c954ad8531db8207e146a03e7588f5fff8625c7a02cb6ca5",
+     "rel_size": 1784,
+     "rilocazioni": 418,
+     "basi": 1
+    },
+    "plane": {
+     "bin_sha256": "3273b1fe54f3fa7c7c8b1bbf253c4144cb68e26555eaf5e943958a3ec482a144",
+     "bin_size": 10584,
+     "rel_sha256": "4c25609c1ede6922a8fe4dcc53d5f1fcffb7109eba4fe09c14cf8bc7164f4f47",
+     "rel_size": 684,
+     "rilocazioni": 147,
+     "basi": 1
+    },
+    "samurai": {
+     "bin_sha256": "ffcc75f1b68a251ac9695f71003c876cf170213e920be234b5b6ffc2f6b50a4c",
+     "bin_size": 12812,
+     "rel_sha256": "7e18bcfa30b4532252c8c9d96e7d747bb44adc455402d6809c18903fe93b9ee0",
+     "rel_size": 820,
+     "rilocazioni": 183,
+     "basi": 1
+    },
+    "sandman": {
+     "bin_sha256": "3f542fef53ccc2e5ee331aba1ca637e6e1da7ec35f23bdd32230d555b4457c1f",
+     "bin_size": 20504,
+     "rel_sha256": "c0ef182f173118bc72bfeec67351a9061cd352295952efe773d879bdd48471f9",
+     "rel_size": 1380,
+     "rilocazioni": 311,
+     "basi": 1
+    },
+    "sandman2": {
+     "bin_sha256": "eb5f90e80712cfe0ab48840a528fe2917748effd339a366ad8931ffbf9b1126e",
+     "bin_size": 22728,
+     "rel_sha256": "42c078bd8ff144fb2056616d394cc25854bd6ca7d9a3b4077d6e88b70b6d9abd",
+     "rel_size": 1752,
+     "rilocazioni": 400,
+     "basi": 1
+    },
+    "selectro": {
+     "bin_sha256": "a3d6aa0577a8c5b022e820de41eaa1eaef33aa9232f7eca976dbd00c2cc19d18",
+     "bin_size": 25380,
+     "rel_sha256": "93252d25170c5397739d33e6b0628793743e5914b385a22909de6bfe4d6aa0c8",
+     "rel_size": 1736,
+     "rilocazioni": 374,
+     "basi": 1
+    },
+    "sentry": {
+     "bin_sha256": "a4a08f5056e9e2d33c046924e5c97a8ea06bf52b9d4972c231a537d4b4c65235",
+     "bin_size": 15088,
+     "rel_sha256": "09c6a7fcb82b70d4693b856f53e3c7fcfea36ca6bfe3e7512b60ecd023db1db8",
+     "rel_size": 1040,
+     "rilocazioni": 224,
+     "basi": 6
+    },
+    "shell": {
+     "bin_sha256": "759e7aeb2a8e3ed7a462fa3a911e081f982295e94e784d34e7057631441f17b8",
+     "bin_size": 84720,
+     "rel_sha256": "9f052a792a8c50c534e360adae60dfe42559f41aab8166e2db0688bbd74c73ac",
+     "rel_size": 7444,
+     "rilocazioni": 1649,
+     "basi": 1
+    },
+    "shocker": {
+     "bin_sha256": "9d1499ef9b9c1ccb0f5bedd934c5274ca4104b994a998283d23dcb08f7efc2e2",
+     "bin_size": 19524,
+     "rel_sha256": "f6bc899da1c35de5688c63a074cfede7d5f95a485f21c1ce9e0a737ab00256bd",
+     "rel_size": 1160,
+     "rilocazioni": 266,
+     "basi": 1
+    },
+    "smoke": {
+     "bin_sha256": "12f3153c9d925166b26eb30d4478ce500f4e1747c69b57fb4991f1d67880d3e9",
+     "bin_size": 3052,
+     "rel_sha256": "2133ca65db75cbf5971a285977b84adeabf8feff4f64c1f6c2915ea96cfc9ef1",
+     "rel_size": 160,
+     "rilocazioni": 30,
+     "basi": 2
+    },
+    "specweb": {
+     "bin_sha256": "49040d497537251710a922ea2c09948edfb72675e868e8b9b529469d516b117d",
+     "bin_size": 20020,
+     "rel_sha256": "316fc11466b6597855aa5d2ad3787cbba3374b3e66793cbe67e09b6d127e4376",
+     "rel_size": 944,
+     "rilocazioni": 193,
+     "basi": 8
+    },
+    "srchlght": {
+     "bin_sha256": "d9e544c7d1583bd933ded8e1d0e0c2695b1055e4f923ec7b84d973fe5c40de7e",
+     "bin_size": 6148,
+     "rel_sha256": "a72bf6872ec6b1de1583bcb844861c9ca042d00b9ab8f14e3e857ea041a3ceaa",
+     "rel_size": 148,
+     "rilocazioni": 31,
+     "basi": 1
+    },
+    "terminal": {
+     "bin_sha256": "2c0dd3e4653766dd3fb09809c0f73218fdd6775f8e7a207efb5d6d8ae6f40144",
+     "bin_size": 19032,
+     "rel_sha256": "22361c7ab05dab00e7430794971260b17a7538c173fd311def30a806f31dcae9",
+     "rel_size": 1760,
+     "rilocazioni": 364,
+     "basi": 3
+    },
+    "thermo": {
+     "bin_sha256": "f86e7518cad3d1018be923f4405e42fc325cd0b5d591148e9588eea15ad9a5c2",
+     "bin_size": 1240,
+     "rel_sha256": "26c0391e801e1f8402f46b04ea1bd9a255a4f19c19e1c04d7cfd659dfaaf6740",
+     "rel_size": 68,
+     "rilocazioni": 12,
+     "basi": 1
+    },
+    "thug": {
+     "bin_sha256": "58819851f555d93484c70bf722bbe066955ad88b416c58f21a484149c575011e",
+     "bin_size": 58404,
+     "rel_sha256": "5c2c66eee10fa79aa59a9055e6fc78d04be2ae5701e3058f5a3306e3878fe558",
+     "rel_size": 4464,
+     "rilocazioni": 1030,
+     "basi": 18
+    },
+    "training": {
+     "bin_sha256": "a44cc7d2bf995ceb683ecdb80b69c2686f4b7875b7a51fd38f75d9f17c4a4838",
+     "bin_size": 3624,
+     "rel_sha256": "b44375aaa92dcdb43d7adeba71ea425169287435030659a461aacafdd1cfdca9",
+     "rel_size": 512,
+     "rilocazioni": 103,
+     "basi": 2
+    },
+    "turret": {
+     "bin_sha256": "b06ed66a9d83621ec1222bf6760441943c79320ef110b9caf2b6fe3318822ea1",
+     "bin_size": 9772,
+     "rel_sha256": "1682288c2d56bfd461e51332a27560beb5c07cdb47c8ef5e092e414771b7d891",
+     "rel_size": 624,
+     "rilocazioni": 127,
+     "basi": 4
+    },
+    "waterpmp": {
+     "bin_sha256": "da97f5851ec315f343ed5f8574b3ec65489a80246ab4cfa7364b266848bbf2c6",
+     "bin_size": 1920,
+     "rel_sha256": "f8873f44dc2057384800a50082ecbd35c10262ebd02070b25abee9475460d4c5",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "xmen": {
+     "bin_sha256": "14c7113ef2d9a4333585d6936ccd6a4dcb7ada7bc13fe8a79ed1228c3780ee7b",
+     "bin_size": 7468,
+     "rel_sha256": "a24b060aea7896fc89296871b0a19d870f6ac979abf2a7d9fa2b4266da162680",
+     "rel_size": 592,
+     "rilocazioni": 133,
+     "basi": 8
+    }
+   }
+  },
+  "SLUS-01378": {
+   "seriale": "SLUS-01378",
+   "exe": "SLUS_013.78",
+   "nome": "USA (originale, prima dell'11 settembre)",
+   "lingua": "inglese",
+   "video": "NTSC",
+   "build": "2001-08-14",
+   "conferma": "croce",
+   "exe_sha1": "8c8b657233c4c8f290700f0fa735cdc6888ce859",
+   "redump": [
+    {
+     "sha1": "2bd7350109dc590533efddc084e52a6622500967",
+     "ambito": "immagine",
+     "nome": "Spider-Man 2 - Enter - Electro (USA)"
+    }
+   ],
+   "dump_basi_sha1": "7108099b8ea82475cdce6491f97972b0da4a9ef2",
+   "moduli": {
+    "chopper": {
+     "bin_sha256": "f576174028527949c7b0c0052063445a52c039e3d57ac64dc2a40ff9831be6b8",
+     "bin_size": 8464,
+     "rel_sha256": "2e23f861c9e8336c605a13df397c12a947cab560a1fa8bfe8bccf3b822689e5d",
+     "rel_size": 592,
+     "rilocazioni": 138,
+     "basi": 3
+    },
+    "credits": {
+     "bin_sha256": "61ea49e9bc25fb10f04e6a9c0ee0e777d2e886c01e11afe5a59d226bd254dfef",
+     "bin_size": 1792,
+     "rel_sha256": "24b5596f8b04021a430f0344e460bf803adea5ff496136c5ebc7b6e7800a8706",
+     "rel_size": 92,
+     "rilocazioni": 17,
+     "basi": 1
+    },
+    "e2m1bomb": {
+     "bin_sha256": "76d00a9f8ee1952665da3de76f417a0b421189a61b991d5f5f0ca6f665e1dc24",
+     "bin_size": 5064,
+     "rel_sha256": "4c42c1127694fbf13a2d7feb7ea7070a95add204c98fb5458a1a0c682b51c693",
+     "rel_size": 440,
+     "rilocazioni": 88,
+     "basi": 1
+    },
+    "e3m0hud": {
+     "bin_sha256": "b7e8e3b45482f29c5927fc593878e5b3001666651dd746a7d339e46ca325a041",
+     "bin_size": 1932,
+     "rel_sha256": "059a0f45a95c58d98c66fd741aed218921798581cd0002b66c60a980d4cfc0c4",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "electro": {
+     "bin_sha256": "354616c0f9dc91755b9775cca8cd588b14eef86e9e328f02b25e9586fb45ec1e",
+     "bin_size": 20560,
+     "rel_sha256": "0e95b093166879768783feec71f80474f55aab53f5dfa6bf741585b2a559a729",
+     "rel_size": 1164,
+     "rilocazioni": 262,
+     "basi": 1
+    },
+    "hamhead": {
+     "bin_sha256": "b9a381d0b9dffd9778a2c4adb233028e6fa8777a8fc89cb44485ce25f6b41c6b",
+     "bin_size": 32928,
+     "rel_sha256": "bd07d9520a7a0aa6ffd12aec1645ac2c9cbda8df87d0edbda6b05a0489363926",
+     "rel_size": 3064,
+     "rilocazioni": 741,
+     "basi": 1
+    },
+    "hostage": {
+     "bin_sha256": "622d5119286775487fda76d2a19c498e5d6e5746e423123bc6363a79770b8265",
+     "bin_size": 3880,
+     "rel_sha256": "a0d8a84b61c9677e34dc74629d7d7715f2e6f803cae051d4366d6797b479ce9a",
+     "rel_size": 312,
+     "rilocazioni": 69,
+     "basi": 1
+    },
+    "lizard": {
+     "bin_sha256": "ee500393a4b70ad886cc45379fa036bfa70629e6d1f925f6e95138a83d5ac39c",
+     "bin_size": 27236,
+     "rel_sha256": "5c3d42fa9696e117c954ad8531db8207e146a03e7588f5fff8625c7a02cb6ca5",
+     "rel_size": 1784,
+     "rilocazioni": 418,
+     "basi": 1
+    },
+    "plane": {
+     "bin_sha256": "5fe84f7b3f3e03be8e64d9c2aeee941e57eb8debf0b238aabe9fc5b72dbf1fa6",
+     "bin_size": 10584,
+     "rel_sha256": "4c25609c1ede6922a8fe4dcc53d5f1fcffb7109eba4fe09c14cf8bc7164f4f47",
+     "rel_size": 684,
+     "rilocazioni": 147,
+     "basi": 1
+    },
+    "samurai": {
+     "bin_sha256": "56ad0a8bffb0dbcc545377452f679ef86cf0f8f173db1ecc9912c78eed9185de",
+     "bin_size": 12812,
+     "rel_sha256": "7e18bcfa30b4532252c8c9d96e7d747bb44adc455402d6809c18903fe93b9ee0",
+     "rel_size": 820,
+     "rilocazioni": 183,
+     "basi": 1
+    },
+    "sandman": {
+     "bin_sha256": "3368b3297dd9747342a129d9939ff535ee06594244e4762956f09d9b692d17a7",
+     "bin_size": 20504,
+     "rel_sha256": "c0ef182f173118bc72bfeec67351a9061cd352295952efe773d879bdd48471f9",
+     "rel_size": 1380,
+     "rilocazioni": 311,
+     "basi": 1
+    },
+    "sandman2": {
+     "bin_sha256": "1d1e5ec519831342f2f082a77ceed0889ce71aee85796e1c81ac3237ed4d7473",
+     "bin_size": 22728,
+     "rel_sha256": "42c078bd8ff144fb2056616d394cc25854bd6ca7d9a3b4077d6e88b70b6d9abd",
+     "rel_size": 1752,
+     "rilocazioni": 400,
+     "basi": 1
+    },
+    "selectro": {
+     "bin_sha256": "ce7139b2e31ea9532157e572831938575c152275ed8a96d7863c17824124946d",
+     "bin_size": 25380,
+     "rel_sha256": "93252d25170c5397739d33e6b0628793743e5914b385a22909de6bfe4d6aa0c8",
+     "rel_size": 1736,
+     "rilocazioni": 374,
+     "basi": 1
+    },
+    "sentry": {
+     "bin_sha256": "e2f50c761a1a91f73b620c6e94181e4a6a938a6cfeabf874255364a911be7edc",
+     "bin_size": 15088,
+     "rel_sha256": "09c6a7fcb82b70d4693b856f53e3c7fcfea36ca6bfe3e7512b60ecd023db1db8",
+     "rel_size": 1040,
+     "rilocazioni": 224,
+     "basi": 6
+    },
+    "shell": {
+     "bin_sha256": "7e84c02a88b1bc474e8129b19d63ff175ce5b0e397d5f2a8bdfdf492c3479779",
+     "bin_size": 84660,
+     "rel_sha256": "1ba42642b5b186557ad9e73b7cec23f5339953b85d7dc9a958315dbb25ac7f37",
+     "rel_size": 7444,
+     "rilocazioni": 1649,
+     "basi": 1
+    },
+    "shocker": {
+     "bin_sha256": "15497af99db9a7c0a47142826eecc58b973168e0a8a0e0321ddeaf977ea9b098",
+     "bin_size": 19524,
+     "rel_sha256": "f6bc899da1c35de5688c63a074cfede7d5f95a485f21c1ce9e0a737ab00256bd",
+     "rel_size": 1160,
+     "rilocazioni": 266,
+     "basi": 1
+    },
+    "smoke": {
+     "bin_sha256": "b9d79d7d1a26d76e3e89e757238d3b0adf4c6373c1ee8352a0e15f28ffd7324b",
+     "bin_size": 3052,
+     "rel_sha256": "2133ca65db75cbf5971a285977b84adeabf8feff4f64c1f6c2915ea96cfc9ef1",
+     "rel_size": 160,
+     "rilocazioni": 30,
+     "basi": 2
+    },
+    "specweb": {
+     "bin_sha256": "3f1083fd3cb3f6b152b4b87174c2ce585d47fb6538c5d2bc52607d8b768328a8",
+     "bin_size": 20020,
+     "rel_sha256": "316fc11466b6597855aa5d2ad3787cbba3374b3e66793cbe67e09b6d127e4376",
+     "rel_size": 944,
+     "rilocazioni": 193,
+     "basi": 8
+    },
+    "srchlght": {
+     "bin_sha256": "04437e22878c9ede6f114a1fb5c6ee4ee1ff74d344841f52d8881a4212961e95",
+     "bin_size": 6148,
+     "rel_sha256": "a72bf6872ec6b1de1583bcb844861c9ca042d00b9ab8f14e3e857ea041a3ceaa",
+     "rel_size": 148,
+     "rilocazioni": 31,
+     "basi": 1
+    },
+    "terminal": {
+     "bin_sha256": "f56443e3c0ccde82bf74db23ed15cf6c0cf8fb7b5760abab0d51bbac1ce487aa",
+     "bin_size": 19032,
+     "rel_sha256": "22361c7ab05dab00e7430794971260b17a7538c173fd311def30a806f31dcae9",
+     "rel_size": 1760,
+     "rilocazioni": 364,
+     "basi": 3
+    },
+    "thermo": {
+     "bin_sha256": "ff9b231f1feb69dc7f0195ef6fee549da68ad0ab70ee4abceaafccf2c674103d",
+     "bin_size": 1240,
+     "rel_sha256": "26c0391e801e1f8402f46b04ea1bd9a255a4f19c19e1c04d7cfd659dfaaf6740",
+     "rel_size": 68,
+     "rilocazioni": 12,
+     "basi": 1
+    },
+    "thug": {
+     "bin_sha256": "95d181d4eb55beeacf1e9ac6acd8ae0b87fdfff13d8307751454a29372442338",
+     "bin_size": 58404,
+     "rel_sha256": "5c2c66eee10fa79aa59a9055e6fc78d04be2ae5701e3058f5a3306e3878fe558",
+     "rel_size": 4464,
+     "rilocazioni": 1030,
+     "basi": 18
+    },
+    "training": {
+     "bin_sha256": "5834788ec8eb711249e0668deefad4209aa18e661b93c694eef91a15358898a7",
+     "bin_size": 3624,
+     "rel_sha256": "b44375aaa92dcdb43d7adeba71ea425169287435030659a461aacafdd1cfdca9",
+     "rel_size": 512,
+     "rilocazioni": 103,
+     "basi": 2
+    },
+    "turret": {
+     "bin_sha256": "8cd70f8e6767a0e90db891dd9e29509e4ecfb060700d228c3444b029aef69c05",
+     "bin_size": 9772,
+     "rel_sha256": "1682288c2d56bfd461e51332a27560beb5c07cdb47c8ef5e092e414771b7d891",
+     "rel_size": 624,
+     "rilocazioni": 127,
+     "basi": 4
+    },
+    "waterpmp": {
+     "bin_sha256": "12be3943d6939dd6f6b381b403206432cbc2590322bab14154c25fd6e52baacc",
+     "bin_size": 1920,
+     "rel_sha256": "f8873f44dc2057384800a50082ecbd35c10262ebd02070b25abee9475460d4c5",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "xmen": {
+     "bin_sha256": "d66c26243fe1eac43fb3d681ca5a3dd2a0ba73c0350701f1f344831be2eb39b4",
+     "bin_size": 7468,
+     "rel_sha256": "a24b060aea7896fc89296871b0a19d870f6ac979abf2a7d9fa2b4266da162680",
+     "rel_size": 592,
+     "rilocazioni": 133,
+     "basi": 8
+    }
+   }
+  },
+  "SLES-03623": {
+   "seriale": "SLES-03623",
+   "exe": "SLES_036.23",
+   "nome": "Europa (originale, prima dell'11 settembre)",
+   "lingua": "inglese",
+   "video": "PAL",
+   "build": "2001-08-14",
+   "conferma": "croce",
+   "exe_sha1": "50c495627588ce55efdeb2f7cb2fbdb55f699145",
+   "redump": [
+    {
+     "sha1": "26423253d82f75a7a460e3f2570cbe527e041737",
+     "ambito": "immagine",
+     "nome": "Spider-Man 2 - Enter - Electro (Europe)"
+    }
+   ],
+   "dump_basi_sha1": "26423253d82f75a7a460e3f2570cbe527e041737",
+   "moduli": {
+    "chopper": {
+     "bin_sha256": "8e9017de8b19506accfa93f7a6c07ddb1e25f91bad1465960c0cf70ce3ba09fa",
+     "bin_size": 8464,
+     "rel_sha256": "2e23f861c9e8336c605a13df397c12a947cab560a1fa8bfe8bccf3b822689e5d",
+     "rel_size": 592,
+     "rilocazioni": 138,
+     "basi": 3
+    },
+    "credits": {
+     "bin_sha256": "cd4acb21858287de2ac0e4022c39d18a29f5afe48aba42b3835f66221c00ef21",
+     "bin_size": 1792,
+     "rel_sha256": "24b5596f8b04021a430f0344e460bf803adea5ff496136c5ebc7b6e7800a8706",
+     "rel_size": 92,
+     "rilocazioni": 17,
+     "basi": 1
+    },
+    "e2m1bomb": {
+     "bin_sha256": "461abb0fc20516908d0940d488e02464929dc808900fbc6be9be048985cf932e",
+     "bin_size": 5064,
+     "rel_sha256": "4c42c1127694fbf13a2d7feb7ea7070a95add204c98fb5458a1a0c682b51c693",
+     "rel_size": 440,
+     "rilocazioni": 88,
+     "basi": 1
+    },
+    "e3m0hud": {
+     "bin_sha256": "4b1a96951eefc6b4b56dfcdb2e53b805ef6f5bf5ed578462448b2a6f81642b75",
+     "bin_size": 1932,
+     "rel_sha256": "059a0f45a95c58d98c66fd741aed218921798581cd0002b66c60a980d4cfc0c4",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "electro": {
+     "bin_sha256": "f20914f7db9def1c02c4393e0950c125eb68afc6adc195bdedd65e347249af85",
+     "bin_size": 20560,
+     "rel_sha256": "0e95b093166879768783feec71f80474f55aab53f5dfa6bf741585b2a559a729",
+     "rel_size": 1164,
+     "rilocazioni": 262,
+     "basi": 1
+    },
+    "hamhead": {
+     "bin_sha256": "11c475e70592269ccc5f05a5155f3909388f7095d7d9fbdc9373e7e292492936",
+     "bin_size": 32928,
+     "rel_sha256": "bd07d9520a7a0aa6ffd12aec1645ac2c9cbda8df87d0edbda6b05a0489363926",
+     "rel_size": 3064,
+     "rilocazioni": 741,
+     "basi": 1
+    },
+    "hostage": {
+     "bin_sha256": "1f15a93bf925dda325ea5a3e509e04377b92109a5706f999ca135791a8d21c93",
+     "bin_size": 3880,
+     "rel_sha256": "a0d8a84b61c9677e34dc74629d7d7715f2e6f803cae051d4366d6797b479ce9a",
+     "rel_size": 312,
+     "rilocazioni": 69,
+     "basi": 1
+    },
+    "lizard": {
+     "bin_sha256": "e3df8b6d215ffac9adb15b6b12c37de49668f2dd55bc02e1b49e2db852b2b9b6",
+     "bin_size": 27236,
+     "rel_sha256": "5c3d42fa9696e117c954ad8531db8207e146a03e7588f5fff8625c7a02cb6ca5",
+     "rel_size": 1784,
+     "rilocazioni": 418,
+     "basi": 1
+    },
+    "plane": {
+     "bin_sha256": "37f285e2f21d332f019e7d645f8a19667d3f03dd795029ea966e058582af8fbc",
+     "bin_size": 10584,
+     "rel_sha256": "4c25609c1ede6922a8fe4dcc53d5f1fcffb7109eba4fe09c14cf8bc7164f4f47",
+     "rel_size": 684,
+     "rilocazioni": 147,
+     "basi": 1
+    },
+    "samurai": {
+     "bin_sha256": "fcfc2ee227086e2a87b5bc4075c2c90925df02b03a85f85b143d451781adf80e",
+     "bin_size": 12812,
+     "rel_sha256": "7e18bcfa30b4532252c8c9d96e7d747bb44adc455402d6809c18903fe93b9ee0",
+     "rel_size": 820,
+     "rilocazioni": 183,
+     "basi": 1
+    },
+    "sandman": {
+     "bin_sha256": "17b0b679bef46475474d90e8afd5de68171674db688d426d8ccc6574ab9c8a89",
+     "bin_size": 20504,
+     "rel_sha256": "c0ef182f173118bc72bfeec67351a9061cd352295952efe773d879bdd48471f9",
+     "rel_size": 1380,
+     "rilocazioni": 311,
+     "basi": 1
+    },
+    "sandman2": {
+     "bin_sha256": "d9b05e394ae11ba905de2cd719228bbb6cefdb66e79eba0a25e84945580a5b9a",
+     "bin_size": 22728,
+     "rel_sha256": "42c078bd8ff144fb2056616d394cc25854bd6ca7d9a3b4077d6e88b70b6d9abd",
+     "rel_size": 1752,
+     "rilocazioni": 400,
+     "basi": 1
+    },
+    "selectro": {
+     "bin_sha256": "ea2e48364bfbc25066ac36b8fce01d9e4d07c6b2f0717197c1d6a17aa511c6d3",
+     "bin_size": 25380,
+     "rel_sha256": "93252d25170c5397739d33e6b0628793743e5914b385a22909de6bfe4d6aa0c8",
+     "rel_size": 1736,
+     "rilocazioni": 374,
+     "basi": 1
+    },
+    "sentry": {
+     "bin_sha256": "882cc948e2f0f440710a8205e9b4945142c91b6333a6ecfa06bc297d4e48c93f",
+     "bin_size": 15088,
+     "rel_sha256": "09c6a7fcb82b70d4693b856f53e3c7fcfea36ca6bfe3e7512b60ecd023db1db8",
+     "rel_size": 1040,
+     "rilocazioni": 224,
+     "basi": 6
+    },
+    "shell": {
+     "bin_sha256": "39f94d7cfbcb67cd2613ee0dedb6fb8e086313260df0db8d7821de3b2b9095a1",
+     "bin_size": 84644,
+     "rel_sha256": "183be6dfad0acdbe81f8ed355699af5aec62af8250160b87b0deb551a80cdf80",
+     "rel_size": 7444,
+     "rilocazioni": 1649,
+     "basi": 1
+    },
+    "shocker": {
+     "bin_sha256": "4e71c142112e401edb331f003fa8efa9b52284adda67fc915d8f708e01b338da",
+     "bin_size": 19524,
+     "rel_sha256": "f6bc899da1c35de5688c63a074cfede7d5f95a485f21c1ce9e0a737ab00256bd",
+     "rel_size": 1160,
+     "rilocazioni": 266,
+     "basi": 1
+    },
+    "smoke": {
+     "bin_sha256": "f9778f54086908d06a97c40db702b275400f92346b45cf341417960ee6945a04",
+     "bin_size": 3052,
+     "rel_sha256": "2133ca65db75cbf5971a285977b84adeabf8feff4f64c1f6c2915ea96cfc9ef1",
+     "rel_size": 160,
+     "rilocazioni": 30,
+     "basi": 2
+    },
+    "specweb": {
+     "bin_sha256": "3a7f5ec4ac775110ed7ba1d67a09e5d7ec6676566fa37869a63307d915af34aa",
+     "bin_size": 20020,
+     "rel_sha256": "316fc11466b6597855aa5d2ad3787cbba3374b3e66793cbe67e09b6d127e4376",
+     "rel_size": 944,
+     "rilocazioni": 193,
+     "basi": 8
+    },
+    "srchlght": {
+     "bin_sha256": "7bc1071a8abded57af3ce25850ba65a282c5d805ac0fba6dc687012a479f26b0",
+     "bin_size": 6148,
+     "rel_sha256": "a72bf6872ec6b1de1583bcb844861c9ca042d00b9ab8f14e3e857ea041a3ceaa",
+     "rel_size": 148,
+     "rilocazioni": 31,
+     "basi": 1
+    },
+    "terminal": {
+     "bin_sha256": "6d5f1aa3bd7af561f416dde3776447477337ca553ed67eef6b317bb597942f89",
+     "bin_size": 19032,
+     "rel_sha256": "22361c7ab05dab00e7430794971260b17a7538c173fd311def30a806f31dcae9",
+     "rel_size": 1760,
+     "rilocazioni": 364,
+     "basi": 3
+    },
+    "thermo": {
+     "bin_sha256": "ad6a83d3bc3cb8629512f8602a249ad8308153bb0d33a916fe9b0552ec19e38a",
+     "bin_size": 1240,
+     "rel_sha256": "26c0391e801e1f8402f46b04ea1bd9a255a4f19c19e1c04d7cfd659dfaaf6740",
+     "rel_size": 68,
+     "rilocazioni": 12,
+     "basi": 1
+    },
+    "thug": {
+     "bin_sha256": "213297cc21bce65a25491e71707babc8c9b530d422426b3d2f34dbf0404ccb71",
+     "bin_size": 58404,
+     "rel_sha256": "5c2c66eee10fa79aa59a9055e6fc78d04be2ae5701e3058f5a3306e3878fe558",
+     "rel_size": 4464,
+     "rilocazioni": 1030,
+     "basi": 18
+    },
+    "training": {
+     "bin_sha256": "9c18fd37e894ab91618287310e27dae789181a2b80026951b7dce0bdd4f3b4f2",
+     "bin_size": 3624,
+     "rel_sha256": "b44375aaa92dcdb43d7adeba71ea425169287435030659a461aacafdd1cfdca9",
+     "rel_size": 512,
+     "rilocazioni": 103,
+     "basi": 2
+    },
+    "turret": {
+     "bin_sha256": "137e6dbde0f38d19b2adb2ebc9f96a4219a3bb8221ba2582263a5b07bc63190d",
+     "bin_size": 9772,
+     "rel_sha256": "1682288c2d56bfd461e51332a27560beb5c07cdb47c8ef5e092e414771b7d891",
+     "rel_size": 624,
+     "rilocazioni": 127,
+     "basi": 4
+    },
+    "waterpmp": {
+     "bin_sha256": "d1f067cec428128f59cc2c10c4606915a857e0c4e42673cdd6a11ea4919d4080",
+     "bin_size": 1920,
+     "rel_sha256": "f8873f44dc2057384800a50082ecbd35c10262ebd02070b25abee9475460d4c5",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "xmen": {
+     "bin_sha256": "f559293e70ef12a1d74b506528221aa32ace84026686ae736bad4d5a0c1c6fe6",
+     "bin_size": 7468,
+     "rel_sha256": "a24b060aea7896fc89296871b0a19d870f6ac979abf2a7d9fa2b4266da162680",
+     "rel_size": 592,
+     "rilocazioni": 133,
+     "basi": 8
+    }
+   }
+  },
+  "SLES-03623-Rev1": {
+   "seriale": "SLES-03623",
+   "exe": "SLES_036.23",
+   "nome": "Europa/Australia Rev 1",
+   "lingua": "inglese",
+   "video": "PAL",
+   "build": "2001-09-19",
+   "conferma": "croce",
+   "exe_sha1": "65bb6f99dc58fd28f5c51092bbe067a4d123f863",
+   "redump": [
+    {
+     "sha1": "4411b3de700fd091c6c7fdb71510e92af5e5542e",
+     "ambito": "immagine",
+     "nome": "Spider-Man 2 - Enter - Electro (Europe, Australia) (Rev 1)"
+    }
+   ],
+   "dump_basi_sha1": "4411b3de700fd091c6c7fdb71510e92af5e5542e",
+   "moduli": {
+    "chopper": {
+     "bin_sha256": "91dd4ca140c90365cfeb152fcccdf6dec961a8bcb48ce1498d30cf1543d4d055",
+     "bin_size": 8464,
+     "rel_sha256": "2e23f861c9e8336c605a13df397c12a947cab560a1fa8bfe8bccf3b822689e5d",
+     "rel_size": 592,
+     "rilocazioni": 138,
+     "basi": 3
+    },
+    "credits": {
+     "bin_sha256": "66324e04ee3a9442ce3783ad2b5d3726bee42ed7419ab75a3af04a0fdb2444ce",
+     "bin_size": 1800,
+     "rel_sha256": "5c8543e42c9de57d77ce59fff3be279948421871931b600c847cf414341f5366",
+     "rel_size": 92,
+     "rilocazioni": 17,
+     "basi": 1
+    },
+    "e2m1bomb": {
+     "bin_sha256": "bc55dd9fbed38dd221b120310e153698b39cfc409c0ccd0935c0db5048707124",
+     "bin_size": 5172,
+     "rel_sha256": "f3fc919fc0aca02206117c61aea22cad946ae967b1ae9c24eecd3bf3d3893ef2",
+     "rel_size": 440,
+     "rilocazioni": 88,
+     "basi": 1
+    },
+    "e3m0hud": {
+     "bin_sha256": "abdbf2a0dd81935e3c12c35f1550f9e9d4503b07dd74a767cdd9ae712bdc6eee",
+     "bin_size": 1940,
+     "rel_sha256": "193096e965e97bcbefa803de883c613f4f70451bddbe0d1861373306f402375a",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "electro": {
+     "bin_sha256": "97dbffbe1a2356b200abadf6b0d124bec6b718568155f551a55b748ed6145811",
+     "bin_size": 20556,
+     "rel_sha256": "4370f4e491e987e6868afd7904d19c76069dadc365a101912cfcd5efed287f39",
+     "rel_size": 1164,
+     "rilocazioni": 262,
+     "basi": 1
+    },
+    "hamhead": {
+     "bin_sha256": "9bbd50538c21083e09d7e9933101589e8348a929feb8d7bffaa90b3a0f9773ca",
+     "bin_size": 32932,
+     "rel_sha256": "54350909a9a561e8e6d737bc3106cf7229ff551849d46767846b8170381730b5",
+     "rel_size": 3064,
+     "rilocazioni": 741,
+     "basi": 1
+    },
+    "hostage": {
+     "bin_sha256": "9da58a8513cf6ce701fc5e5164ad05dc3c51ef889b412706f407a25359e86c83",
+     "bin_size": 3944,
+     "rel_sha256": "bd0a68bb0db90a0324a1f46c4ef7ea8e057c6ef61084b57eb5456e1f474b9f3c",
+     "rel_size": 312,
+     "rilocazioni": 69,
+     "basi": 1
+    },
+    "lizard": {
+     "bin_sha256": "68e176cc2e5a75721e6ba05056f80a429a994b02c25c7d93bcc76f892c991f60",
+     "bin_size": 27356,
+     "rel_sha256": "209fa0d8e0bd7614f81e9501a24bf60270881e06e90ab404003af5f339d6a149",
+     "rel_size": 1784,
+     "rilocazioni": 418,
+     "basi": 1
+    },
+    "plane": {
+     "bin_sha256": "f1f2dd082c418a47187274dbb87944466b17f7f23f82a21c5ed99df7d1b1601e",
+     "bin_size": 10648,
+     "rel_sha256": "06dac92d6a2280e7b7dceb82ec6b906147acc434eb18b0e13beb78d80e6959c6",
+     "rel_size": 684,
+     "rilocazioni": 147,
+     "basi": 1
+    },
+    "samurai": {
+     "bin_sha256": "9f69f56c214f34048028e8e98a2aeffd25fcdfefa1a30b0f9ea0d5a62ff858dc",
+     "bin_size": 12888,
+     "rel_sha256": "e8808466d874d07912a1bbcfa33225a04eeec25af8927929a90419cc31318b45",
+     "rel_size": 820,
+     "rilocazioni": 183,
+     "basi": 1
+    },
+    "sandman": {
+     "bin_sha256": "3d357235123954ee8da03488729a1268102f250a29484bba3b8454b61cb0292a",
+     "bin_size": 20568,
+     "rel_sha256": "5a14243bd452a286afb4f45b7c2721e6501e04d92f47f2348bc84d37d535cd30",
+     "rel_size": 1380,
+     "rilocazioni": 311,
+     "basi": 1
+    },
+    "sandman2": {
+     "bin_sha256": "c29ab5bd12a0e6e2ff8d465cd7cac23417a19ce637eb1d0067e24a872ca0c464",
+     "bin_size": 22792,
+     "rel_sha256": "582edc0ffff1341809d4a56526fba5115e580309a8ee217e5fd5d751bf815562",
+     "rel_size": 1752,
+     "rilocazioni": 400,
+     "basi": 1
+    },
+    "selectro": {
+     "bin_sha256": "56e9ff5ed25a90a81e080acb83669d9dbccad39e57f3cbdcc715a532b2b4126a",
+     "bin_size": 25476,
+     "rel_sha256": "462503a46ddd4429b28bb21c07bbb9a68bbbf20cd0b634a9eabaa8afee6ababf",
+     "rel_size": 1736,
+     "rilocazioni": 374,
+     "basi": 1
+    },
+    "sentry": {
+     "bin_sha256": "e9a3c723cc9bcb97f5e7a3b41eee2ce73418ad7ff6ac9f919882a30d6b466ba6",
+     "bin_size": 15088,
+     "rel_sha256": "09c6a7fcb82b70d4693b856f53e3c7fcfea36ca6bfe3e7512b60ecd023db1db8",
+     "rel_size": 1040,
+     "rilocazioni": 224,
+     "basi": 6
+    },
+    "shell": {
+     "bin_sha256": "1ce6d7d9de78a4bb6602d0e3a0735db7775af5b6aa36e552855e055bd7a39e23",
+     "bin_size": 84768,
+     "rel_sha256": "958d653a73551d84a9b317b51febadde54481428412ebf00e634f57fd75c6444",
+     "rel_size": 7444,
+     "rilocazioni": 1649,
+     "basi": 1
+    },
+    "shocker": {
+     "bin_sha256": "50f314c668883c2144159c888bc2198cd8923aee8e3a4df2e56d132d2cbb92f7",
+     "bin_size": 19588,
+     "rel_sha256": "8be2353ab1bcd113898090c2442c57ac33acc7a42f1610cbf3ae78ec8fff67d2",
+     "rel_size": 1160,
+     "rilocazioni": 266,
+     "basi": 1
+    },
+    "smoke": {
+     "bin_sha256": "877a84bb614796c29ebde1dc164c6954cb46a3252f96108e774d40fdc9b5b2b0",
+     "bin_size": 3112,
+     "rel_sha256": "3585d0764150e6bdb0c92ac77645945d40f6553f7a0a45a25008ba23e6415d6b",
+     "rel_size": 160,
+     "rilocazioni": 30,
+     "basi": 2
+    },
+    "specweb": {
+     "bin_sha256": "1cce9853b25efc276018e79e9210fda3ecc7a621a4ed60457102db2c9d002a86",
+     "bin_size": 20020,
+     "rel_sha256": "316fc11466b6597855aa5d2ad3787cbba3374b3e66793cbe67e09b6d127e4376",
+     "rel_size": 944,
+     "rilocazioni": 193,
+     "basi": 8
+    },
+    "srchlght": {
+     "bin_sha256": "7e31ec087e1280e062ca05599552da7f664460ec523be6d42d18482d1d3ead5d",
+     "bin_size": 6148,
+     "rel_sha256": "a72bf6872ec6b1de1583bcb844861c9ca042d00b9ab8f14e3e857ea041a3ceaa",
+     "rel_size": 148,
+     "rilocazioni": 31,
+     "basi": 1
+    },
+    "terminal": {
+     "bin_sha256": "5fcfc69081199d7f8815e4185bd2a726cba5088725e289e22e67d7eb8da3a836",
+     "bin_size": 19036,
+     "rel_sha256": "278a5e0cdf6e1d3dc6f3ee98adbcb652ba4a38e7c98855427d91db16be742bdb",
+     "rel_size": 1760,
+     "rilocazioni": 364,
+     "basi": 3
+    },
+    "thermo": {
+     "bin_sha256": "5469a5fda7eb905fc36fed1fd39761c4942f2296224ba0a14c1ddf7a74274074",
+     "bin_size": 1284,
+     "rel_sha256": "52f9cc4be6e9689b10f2495ffaf580f9f9b792527877dc42807226bcd0f6e915",
+     "rel_size": 68,
+     "rilocazioni": 12,
+     "basi": 1
+    },
+    "thug": {
+     "bin_sha256": "fe3335bf4666d6a8094200a876154aaa61900d07029cfca30e032fb7bdee246a",
+     "bin_size": 58468,
+     "rel_sha256": "c899d8f6cfbff31db411dc890b409684c0b92aed88d7f171051ba0f0efa3b5a5",
+     "rel_size": 4464,
+     "rilocazioni": 1030,
+     "basi": 18
+    },
+    "training": {
+     "bin_sha256": "aa2b6179dc3673a803f864d3a195f26dd8e9799380468e25703100de853ff624",
+     "bin_size": 3624,
+     "rel_sha256": "b44375aaa92dcdb43d7adeba71ea425169287435030659a461aacafdd1cfdca9",
+     "rel_size": 512,
+     "rilocazioni": 103,
+     "basi": 2
+    },
+    "turret": {
+     "bin_sha256": "f471cb5a059263a1f60d2ee08a960a495d87e41145e39a31a3bbf47c902e1ef0",
+     "bin_size": 9816,
+     "rel_sha256": "b01b5a20b8b39e8bdadf9bd2bbb78e0e86e9fad7c380082244077ac3f5312653",
+     "rel_size": 624,
+     "rilocazioni": 127,
+     "basi": 4
+    },
+    "waterpmp": {
+     "bin_sha256": "204e084011d6ad2ed8815cf607637fa2f752513cb9a044862795d0b3f95d75a1",
+     "bin_size": 1920,
+     "rel_sha256": "f8873f44dc2057384800a50082ecbd35c10262ebd02070b25abee9475460d4c5",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "xmen": {
+     "bin_sha256": "71dec149f076ab34071309248866d10cc9b61a1ebe359fe1d5901ee29cc9b998",
+     "bin_size": 7552,
+     "rel_sha256": "9ba8fc7425bdbe29241310e1931c659231a8834f520106e0705010f61716eddd",
+     "rel_size": 592,
+     "rilocazioni": 133,
+     "basi": 8
+    }
+   }
+  },
+  "SLES-03624": {
+   "seriale": "SLES-03624",
+   "exe": "SLES_036.24",
+   "nome": "Francia",
+   "lingua": "francese",
+   "video": "PAL",
+   "build": "2001-09-20",
+   "conferma": "croce",
+   "exe_sha1": "f537f49cda09d13b382bc145f27982ffc30c59c1",
+   "redump": [
+    {
+     "sha1": "c97f87913c3ee3221dab408ebadfe5c5811af02b",
+     "ambito": "immagine",
+     "nome": "Spider-Man 2 - La Revanche d'Electro (France)"
+    }
+   ],
+   "dump_basi_sha1": "c97f87913c3ee3221dab408ebadfe5c5811af02b",
+   "moduli": {
+    "chopper": {
+     "bin_sha256": "7ab16196452ad1bb9544cf6875f410212aee657b01d8f1419ebc48fa12a4e635",
+     "bin_size": 8464,
+     "rel_sha256": "2e23f861c9e8336c605a13df397c12a947cab560a1fa8bfe8bccf3b822689e5d",
+     "rel_size": 592,
+     "rilocazioni": 138,
+     "basi": 3
+    },
+    "credits": {
+     "bin_sha256": "a36cf9457fd3f656ddbb65863f1f3a23abbe56330a850d14080864e14340463c",
+     "bin_size": 1800,
+     "rel_sha256": "5c8543e42c9de57d77ce59fff3be279948421871931b600c847cf414341f5366",
+     "rel_size": 92,
+     "rilocazioni": 17,
+     "basi": 1
+    },
+    "e2m1bomb": {
+     "bin_sha256": "cae41307cf732a19010165077e782dbad4e96c978caea9936711c807fc67c0df",
+     "bin_size": 5172,
+     "rel_sha256": "f3fc919fc0aca02206117c61aea22cad946ae967b1ae9c24eecd3bf3d3893ef2",
+     "rel_size": 440,
+     "rilocazioni": 88,
+     "basi": 1
+    },
+    "e3m0hud": {
+     "bin_sha256": "11d54c6eda283450699ee1a56b58735c5ba56b94a098ff51fba071ef104ad325",
+     "bin_size": 1940,
+     "rel_sha256": "193096e965e97bcbefa803de883c613f4f70451bddbe0d1861373306f402375a",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "electro": {
+     "bin_sha256": "1ee3ddeeae1f716c5f40b92cad1d8685b7f7de93975ead5c14766cb15ff33629",
+     "bin_size": 20556,
+     "rel_sha256": "4370f4e491e987e6868afd7904d19c76069dadc365a101912cfcd5efed287f39",
+     "rel_size": 1164,
+     "rilocazioni": 262,
+     "basi": 1
+    },
+    "hamhead": {
+     "bin_sha256": "9d48f60765d2386b21d574bef9e11e97f3df3f78e6d457354192059913b8d50a",
+     "bin_size": 32932,
+     "rel_sha256": "54350909a9a561e8e6d737bc3106cf7229ff551849d46767846b8170381730b5",
+     "rel_size": 3064,
+     "rilocazioni": 741,
+     "basi": 1
+    },
+    "hostage": {
+     "bin_sha256": "616066ab106a7da5e5222a9f8e59de6497082844734864a938c3a5c708813247",
+     "bin_size": 3944,
+     "rel_sha256": "bd0a68bb0db90a0324a1f46c4ef7ea8e057c6ef61084b57eb5456e1f474b9f3c",
+     "rel_size": 312,
+     "rilocazioni": 69,
+     "basi": 1
+    },
+    "lizard": {
+     "bin_sha256": "840799e0d16dac1b4ed42d00fe8e351cb042860e5c2dce46e5954cbfcbedeef3",
+     "bin_size": 27356,
+     "rel_sha256": "209fa0d8e0bd7614f81e9501a24bf60270881e06e90ab404003af5f339d6a149",
+     "rel_size": 1784,
+     "rilocazioni": 418,
+     "basi": 1
+    },
+    "plane": {
+     "bin_sha256": "3584aa81b78542a69025dd3a3e81a9c200c8351067ea7ca8ceae5ace791c5cb7",
+     "bin_size": 10648,
+     "rel_sha256": "06dac92d6a2280e7b7dceb82ec6b906147acc434eb18b0e13beb78d80e6959c6",
+     "rel_size": 684,
+     "rilocazioni": 147,
+     "basi": 1
+    },
+    "samurai": {
+     "bin_sha256": "988f17f96b06a4e1894d0e55076c881423472a233d9e3eb94bfe27c995bf2e71",
+     "bin_size": 12888,
+     "rel_sha256": "e8808466d874d07912a1bbcfa33225a04eeec25af8927929a90419cc31318b45",
+     "rel_size": 820,
+     "rilocazioni": 183,
+     "basi": 1
+    },
+    "sandman": {
+     "bin_sha256": "987e813e70029f796bef2e27435f68aab350aa714d00b753ba9804c9bada8a73",
+     "bin_size": 20568,
+     "rel_sha256": "5a14243bd452a286afb4f45b7c2721e6501e04d92f47f2348bc84d37d535cd30",
+     "rel_size": 1380,
+     "rilocazioni": 311,
+     "basi": 1
+    },
+    "sandman2": {
+     "bin_sha256": "154ec806f34386ab4a7b178834ab19abbedc8fdcb786be2ebae6441c0b15a461",
+     "bin_size": 22792,
+     "rel_sha256": "582edc0ffff1341809d4a56526fba5115e580309a8ee217e5fd5d751bf815562",
+     "rel_size": 1752,
+     "rilocazioni": 400,
+     "basi": 1
+    },
+    "selectro": {
+     "bin_sha256": "30f490c4d22e7eae0170466b6f2002e3630cf513171e550bf179718e133298ec",
+     "bin_size": 25476,
+     "rel_sha256": "462503a46ddd4429b28bb21c07bbb9a68bbbf20cd0b634a9eabaa8afee6ababf",
+     "rel_size": 1736,
+     "rilocazioni": 374,
+     "basi": 1
+    },
+    "sentry": {
+     "bin_sha256": "42c87da05a6e11e80b9b5980cc91d20c8869a1c2eff0b8fd65512f022a648512",
+     "bin_size": 15088,
+     "rel_sha256": "09c6a7fcb82b70d4693b856f53e3c7fcfea36ca6bfe3e7512b60ecd023db1db8",
+     "rel_size": 1040,
+     "rilocazioni": 224,
+     "basi": 6
+    },
+    "shell": {
+     "bin_sha256": "a28cafb3231ab41f242769ac60581083391c74be50f880a693f5fd28c53beded",
+     "bin_size": 85124,
+     "rel_sha256": "2cb85dbe378b11a1f6fcebffe13f1cd59cb2881cddeea86b39fd8cf5ee9a011f",
+     "rel_size": 7536,
+     "rilocazioni": 1664,
+     "basi": 1
+    },
+    "shocker": {
+     "bin_sha256": "4acb61c92bffb14173eea5db479016e2c3853d2a886f5e3fae98983170374a05",
+     "bin_size": 19588,
+     "rel_sha256": "8be2353ab1bcd113898090c2442c57ac33acc7a42f1610cbf3ae78ec8fff67d2",
+     "rel_size": 1160,
+     "rilocazioni": 266,
+     "basi": 1
+    },
+    "smoke": {
+     "bin_sha256": "25e862982a648a6f71745569438b6d64a61f9a83f12edfb27ecc6c25f4b8a018",
+     "bin_size": 3112,
+     "rel_sha256": "3585d0764150e6bdb0c92ac77645945d40f6553f7a0a45a25008ba23e6415d6b",
+     "rel_size": 160,
+     "rilocazioni": 30,
+     "basi": 2
+    },
+    "specweb": {
+     "bin_sha256": "e51d86eb14254e15de63dcf075b9438ad61478ca0e2af62174f77a7fe864c2b4",
+     "bin_size": 20020,
+     "rel_sha256": "316fc11466b6597855aa5d2ad3787cbba3374b3e66793cbe67e09b6d127e4376",
+     "rel_size": 944,
+     "rilocazioni": 193,
+     "basi": 8
+    },
+    "srchlght": {
+     "bin_sha256": "552e5537c1619eb998831a3710080ddc34d9465d368563c4941a7e7a34b0d200",
+     "bin_size": 6148,
+     "rel_sha256": "a72bf6872ec6b1de1583bcb844861c9ca042d00b9ab8f14e3e857ea041a3ceaa",
+     "rel_size": 148,
+     "rilocazioni": 31,
+     "basi": 1
+    },
+    "terminal": {
+     "bin_sha256": "cbe2c457530dd8a90d703fecb8e031e403863649106d40cad0a0207fd2247e9d",
+     "bin_size": 19036,
+     "rel_sha256": "278a5e0cdf6e1d3dc6f3ee98adbcb652ba4a38e7c98855427d91db16be742bdb",
+     "rel_size": 1760,
+     "rilocazioni": 364,
+     "basi": 3
+    },
+    "thermo": {
+     "bin_sha256": "9f06d6c76dcd0c784c57cd13774dc96ba6da765e17fda01327716a1572c58e22",
+     "bin_size": 1284,
+     "rel_sha256": "52f9cc4be6e9689b10f2495ffaf580f9f9b792527877dc42807226bcd0f6e915",
+     "rel_size": 68,
+     "rilocazioni": 12,
+     "basi": 1
+    },
+    "thug": {
+     "bin_sha256": "9b31b398dcb2fc10efec55509882bf1f1f2e916a8e88b9544831e7ff3bc56936",
+     "bin_size": 58468,
+     "rel_sha256": "c899d8f6cfbff31db411dc890b409684c0b92aed88d7f171051ba0f0efa3b5a5",
+     "rel_size": 4464,
+     "rilocazioni": 1030,
+     "basi": 18
+    },
+    "training": {
+     "bin_sha256": "818f3f9b36def21f2c4a9a201a4b8a2b2d66ee0e56f3f7836760bf3824e50c40",
+     "bin_size": 3652,
+     "rel_sha256": "3530bc1a9c64a4e9d7246116bd13a9d7182e80af1ef8452b91ba7d47c5c25eec",
+     "rel_size": 512,
+     "rilocazioni": 103,
+     "basi": 2
+    },
+    "turret": {
+     "bin_sha256": "5dda8a8e2d86a7d8714d349b6f0cb7160e2bd2eff135d739c2e69cd64db3c52e",
+     "bin_size": 9816,
+     "rel_sha256": "b01b5a20b8b39e8bdadf9bd2bbb78e0e86e9fad7c380082244077ac3f5312653",
+     "rel_size": 624,
+     "rilocazioni": 127,
+     "basi": 4
+    },
+    "waterpmp": {
+     "bin_sha256": "6742209b26f308f60ea0edd0cf35dfed4e34a110542b9d1fd57165ccf692710a",
+     "bin_size": 1920,
+     "rel_sha256": "f8873f44dc2057384800a50082ecbd35c10262ebd02070b25abee9475460d4c5",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "xmen": {
+     "bin_sha256": "27e8084859005c2ea538d22cd8fe37aab403e7e424f0a82918799113aab611e4",
+     "bin_size": 7552,
+     "rel_sha256": "9ba8fc7425bdbe29241310e1931c659231a8834f520106e0705010f61716eddd",
+     "rel_size": 592,
+     "rilocazioni": 133,
+     "basi": 8
+    }
+   }
+  },
+  "SLES-03625": {
+   "seriale": "SLES-03625",
+   "exe": "SLES_036.25",
+   "nome": "Germania",
+   "lingua": "tedesco",
+   "video": "PAL",
+   "build": "2001-09-20",
+   "conferma": "croce",
+   "exe_sha1": "2c1f0849d183234f31553dd568cefd93a0225cad",
+   "redump": [
+    {
+     "sha1": "1d7ccb672001ed8a018e59c41326fa4d80150b26",
+     "ambito": "immagine",
+     "nome": "Spider-Man 2 - Enter - Electro (Germany)"
+    }
+   ],
+   "dump_basi_sha1": "1d7ccb672001ed8a018e59c41326fa4d80150b26",
+   "moduli": {
+    "chopper": {
+     "bin_sha256": "1f940ec194d70624f442c2773ca5a0d550e177b15cd775799e6b231714df7a5f",
+     "bin_size": 8464,
+     "rel_sha256": "2e23f861c9e8336c605a13df397c12a947cab560a1fa8bfe8bccf3b822689e5d",
+     "rel_size": 592,
+     "rilocazioni": 138,
+     "basi": 3
+    },
+    "credits": {
+     "bin_sha256": "946c08ece0bd5a1c931ddd15e80f1962a207da7ee6ebbdac28d859b47cd759a1",
+     "bin_size": 1800,
+     "rel_sha256": "5c8543e42c9de57d77ce59fff3be279948421871931b600c847cf414341f5366",
+     "rel_size": 92,
+     "rilocazioni": 17,
+     "basi": 1
+    },
+    "e2m1bomb": {
+     "bin_sha256": "70bdb185f89721a9c6fd66318428ab6ddeb3a8c50d6692477c4817b9ef60463a",
+     "bin_size": 5172,
+     "rel_sha256": "f3fc919fc0aca02206117c61aea22cad946ae967b1ae9c24eecd3bf3d3893ef2",
+     "rel_size": 440,
+     "rilocazioni": 88,
+     "basi": 1
+    },
+    "e3m0hud": {
+     "bin_sha256": "be09b4493e164031d20482cf3f8178a457c2d9fc9bf88f6f169be98803656c9b",
+     "bin_size": 1940,
+     "rel_sha256": "193096e965e97bcbefa803de883c613f4f70451bddbe0d1861373306f402375a",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "electro": {
+     "bin_sha256": "2f8b196d321a4b87809c52d93452ff98e7367d92a35a418945b9b12c3b38eb88",
+     "bin_size": 20556,
+     "rel_sha256": "4370f4e491e987e6868afd7904d19c76069dadc365a101912cfcd5efed287f39",
+     "rel_size": 1164,
+     "rilocazioni": 262,
+     "basi": 1
+    },
+    "hamhead": {
+     "bin_sha256": "b40ef05a83b2eeb9e297b0af5bfdbe791636be2e9e2d311e4c22239451bffce6",
+     "bin_size": 32932,
+     "rel_sha256": "54350909a9a561e8e6d737bc3106cf7229ff551849d46767846b8170381730b5",
+     "rel_size": 3064,
+     "rilocazioni": 741,
+     "basi": 1
+    },
+    "hostage": {
+     "bin_sha256": "770dee824c4c81f96fa17b7642526643db407ff660ac62a5a7b6af0777cd1b7f",
+     "bin_size": 3944,
+     "rel_sha256": "bd0a68bb0db90a0324a1f46c4ef7ea8e057c6ef61084b57eb5456e1f474b9f3c",
+     "rel_size": 312,
+     "rilocazioni": 69,
+     "basi": 1
+    },
+    "lizard": {
+     "bin_sha256": "657acf6b1f64c16db78f33159141de117c5705ad0cf3edb728a0bedd32cc64ca",
+     "bin_size": 27356,
+     "rel_sha256": "209fa0d8e0bd7614f81e9501a24bf60270881e06e90ab404003af5f339d6a149",
+     "rel_size": 1784,
+     "rilocazioni": 418,
+     "basi": 1
+    },
+    "plane": {
+     "bin_sha256": "d4b406c265bb599140a78793a590855e912ea4d672d20d1252422bf950d36b73",
+     "bin_size": 10648,
+     "rel_sha256": "06dac92d6a2280e7b7dceb82ec6b906147acc434eb18b0e13beb78d80e6959c6",
+     "rel_size": 684,
+     "rilocazioni": 147,
+     "basi": 1
+    },
+    "samurai": {
+     "bin_sha256": "06421c80e94437ed5719ae9c5cc7a6b2232ce9dfa3512d0965698b4342a0f07b",
+     "bin_size": 12888,
+     "rel_sha256": "e8808466d874d07912a1bbcfa33225a04eeec25af8927929a90419cc31318b45",
+     "rel_size": 820,
+     "rilocazioni": 183,
+     "basi": 1
+    },
+    "sandman": {
+     "bin_sha256": "80bc56c6778e1bdee66acbbc6d56026f8b7d30dfa1aa191d00812b9904c14c46",
+     "bin_size": 20568,
+     "rel_sha256": "5a14243bd452a286afb4f45b7c2721e6501e04d92f47f2348bc84d37d535cd30",
+     "rel_size": 1380,
+     "rilocazioni": 311,
+     "basi": 1
+    },
+    "sandman2": {
+     "bin_sha256": "eedae3f7546e5b21353aa247f02b637560835427cd6eb63cd9edffc8d89a7baa",
+     "bin_size": 22792,
+     "rel_sha256": "582edc0ffff1341809d4a56526fba5115e580309a8ee217e5fd5d751bf815562",
+     "rel_size": 1752,
+     "rilocazioni": 400,
+     "basi": 1
+    },
+    "selectro": {
+     "bin_sha256": "0cb3de0e173cd9b138155aa5df98701d83f49a27fdc8d13e17785ca98582f437",
+     "bin_size": 25476,
+     "rel_sha256": "462503a46ddd4429b28bb21c07bbb9a68bbbf20cd0b634a9eabaa8afee6ababf",
+     "rel_size": 1736,
+     "rilocazioni": 374,
+     "basi": 1
+    },
+    "sentry": {
+     "bin_sha256": "553152c1e863c4cea7c80139bdf90b137d1c73ff7c1c15b63600f934eddced68",
+     "bin_size": 15088,
+     "rel_sha256": "09c6a7fcb82b70d4693b856f53e3c7fcfea36ca6bfe3e7512b60ecd023db1db8",
+     "rel_size": 1040,
+     "rilocazioni": 224,
+     "basi": 6
+    },
+    "shell": {
+     "bin_sha256": "437579eb0902af2ce8eacf7b172582d3e93985b38f5ba629c58158d820ef7937",
+     "bin_size": 84808,
+     "rel_sha256": "4957f75d91ad345ecdb1936b8b2358236d45b4ef177f00030a11f1f533ad680e",
+     "rel_size": 7460,
+     "rilocazioni": 1651,
+     "basi": 1
+    },
+    "shocker": {
+     "bin_sha256": "324d5f20ef29068e66fa8a4a02cd1ae9d39685e54ec6c910665f4dcd0c79e216",
+     "bin_size": 19588,
+     "rel_sha256": "8be2353ab1bcd113898090c2442c57ac33acc7a42f1610cbf3ae78ec8fff67d2",
+     "rel_size": 1160,
+     "rilocazioni": 266,
+     "basi": 1
+    },
+    "smoke": {
+     "bin_sha256": "9a0bf9aa8a1c30ea4cb22b03d88398817b74c8d9278c690c80e6c4c13f8afd8a",
+     "bin_size": 3112,
+     "rel_sha256": "3585d0764150e6bdb0c92ac77645945d40f6553f7a0a45a25008ba23e6415d6b",
+     "rel_size": 160,
+     "rilocazioni": 30,
+     "basi": 2
+    },
+    "specweb": {
+     "bin_sha256": "52f3026091c8906df5718e68b5e025e57345446ee205e501bdfee35e3ab9d210",
+     "bin_size": 20020,
+     "rel_sha256": "316fc11466b6597855aa5d2ad3787cbba3374b3e66793cbe67e09b6d127e4376",
+     "rel_size": 944,
+     "rilocazioni": 193,
+     "basi": 8
+    },
+    "srchlght": {
+     "bin_sha256": "f89f7b51b85f857848724c6463cb5cedb15b282555724c93432ef666a87a152f",
+     "bin_size": 6148,
+     "rel_sha256": "a72bf6872ec6b1de1583bcb844861c9ca042d00b9ab8f14e3e857ea041a3ceaa",
+     "rel_size": 148,
+     "rilocazioni": 31,
+     "basi": 1
+    },
+    "terminal": {
+     "bin_sha256": "6b6e76dfd1278712febb0f2f1974bb6201383ef5e37fddf5c17aee96f3ff937f",
+     "bin_size": 19036,
+     "rel_sha256": "278a5e0cdf6e1d3dc6f3ee98adbcb652ba4a38e7c98855427d91db16be742bdb",
+     "rel_size": 1760,
+     "rilocazioni": 364,
+     "basi": 3
+    },
+    "thermo": {
+     "bin_sha256": "f68913da671f23a9ee05035e1c8478b693641b60db67613b7ed5c065440a831c",
+     "bin_size": 1284,
+     "rel_sha256": "52f9cc4be6e9689b10f2495ffaf580f9f9b792527877dc42807226bcd0f6e915",
+     "rel_size": 68,
+     "rilocazioni": 12,
+     "basi": 1
+    },
+    "thug": {
+     "bin_sha256": "729dca8c108a1eac5fb21f243c255425a0d650d4321a537a85ee3b6ab52f42cf",
+     "bin_size": 58468,
+     "rel_sha256": "c899d8f6cfbff31db411dc890b409684c0b92aed88d7f171051ba0f0efa3b5a5",
+     "rel_size": 4464,
+     "rilocazioni": 1030,
+     "basi": 18
+    },
+    "training": {
+     "bin_sha256": "81fec894f8c6d6398021e984555decb3b19e1807da40e6d1cb35e9e7fed3f564",
+     "bin_size": 3608,
+     "rel_sha256": "90f96522f76cb2d35953d53ee2ccd72c7427fe324e1dbd621e2334527f80631a",
+     "rel_size": 512,
+     "rilocazioni": 103,
+     "basi": 2
+    },
+    "turret": {
+     "bin_sha256": "8147f2b7ae110b882f234f49b48c5245efd65802a124a98586a7776452f0bc55",
+     "bin_size": 9816,
+     "rel_sha256": "b01b5a20b8b39e8bdadf9bd2bbb78e0e86e9fad7c380082244077ac3f5312653",
+     "rel_size": 624,
+     "rilocazioni": 127,
+     "basi": 4
+    },
+    "waterpmp": {
+     "bin_sha256": "312314f6bcd076c7ac97aba838e5f73002c27aaf5a1476697c3522929e2dc6d2",
+     "bin_size": 1920,
+     "rel_sha256": "f8873f44dc2057384800a50082ecbd35c10262ebd02070b25abee9475460d4c5",
+     "rel_size": 72,
+     "rilocazioni": 13,
+     "basi": 1
+    },
+    "xmen": {
+     "bin_sha256": "a8cf4e743c088f0301483958fd9d859c037ef3a14ab33a87628138b9745200ac",
+     "bin_size": 7552,
+     "rel_sha256": "9ba8fc7425bdbe29241310e1931c659231a8834f520106e0705010f61716eddd",
+     "rel_size": 592,
+     "rilocazioni": 133,
+     "basi": 8
+    }
+   }
+  },
+  "SLPM-87073": {
+   "seriale": "SLPM-87073",
+   "exe": "SLPM_870.73",
+   "nome": "Giappone",
+   "lingua": "giapponese",
+   "video": "NTSC",
+   "build": "2002-07-19",
+   "conferma": "cerchio",
+   "exe_sha1": "02714c6419c0d510ced3d9544d3e0ace6c48d097",
+   "redump": [
+    {
+     "sha1": "f34cb84dc801892bf4356785b6161bfb27dc9964",
+     "ambito": "traccia dati",
+     "nome": "Spider-Man 2 - Enter - Electro (Japan) (Track 1)"
+    }
+   ],
+   "dump_basi_sha1": "d4a3e8e651f4aa96c777c2a00c281be527b871a9",
+   "moduli": {
+    "chopper": {
+     "bin_sha256": "188b1d934f324b958dc145a44a5621c16e0e7228ad144ae78e3d8f781a9a03ef",
+     "bin_size": 8468,
+     "rel_sha256": "587607d4eb53b1598e64a0d59275154ad42802e1e0efedcd3d8422947598b9b6",
+     "rel_size": 616,
+     "rilocazioni": 144,
+     "basi": 3
+    },
+    "credits": {
+     "bin_sha256": "05900a334400000bba72969dad2d9ff05aabb1f1d0bdf9a2e018deb65a70c22e",
+     "bin_size": 1748,
+     "rel_sha256": "cd29e6cfe1b6f540df68532a50f74a6ab17471604ed441c2e42fbf4ea5e48c5f",
+     "rel_size": 100,
+     "rilocazioni": 19,
+     "basi": 1
+    },
+    "e2m1bomb": {
+     "bin_sha256": "a7d569a1541777b88374128c44c7aaa15b0ef5b1d8bf010f13089ea2e7b10389",
+     "bin_size": 5092,
+     "rel_sha256": "e544343a742451492b8c7fcac3d60525be22fb4b2a17706f76e0c00ccaaf55b8",
+     "rel_size": 448,
+     "rilocazioni": 90,
+     "basi": 1
+    },
+    "e3m0hud": {
+     "bin_sha256": "37cd931757967f385a0c69eaee9e06e315cf9e7bf20eeac482acf298fed01f4c",
+     "bin_size": 1916,
+     "rel_sha256": "956322981a61cd1acde214468f367ba2057069b9b05dec7cfe31b2c54e8bccaf",
+     "rel_size": 76,
+     "rilocazioni": 14,
+     "basi": 1
+    },
+    "electro": {
+     "bin_sha256": "ed6256b04991a9db77a24194b08af876d4f352997515bfad15656f87fbac6d70",
+     "bin_size": 20348,
+     "rel_sha256": "cb1472ed82ae1c921cdd5537e58f5ff0ffc07317ac7ed1b08e97e877e9082020",
+     "rel_size": 1180,
+     "rilocazioni": 266,
+     "basi": 1
+    },
+    "hamhead": {
+     "bin_sha256": "89c72ed23771b5d24476b99f3be1020c3322b5d80a460d6bf1078ebd5b76c9b9",
+     "bin_size": 33120,
+     "rel_sha256": "bc5df96807224e0e279d3c80293a5762cc42ac37887c1667ee3720012094eaa3",
+     "rel_size": 3108,
+     "rilocazioni": 752,
+     "basi": 1
+    },
+    "hostage": {
+     "bin_sha256": "3afd437b9748e0fbd38bbf35228a59b0b4f5a53f42832db20888d25221ac3f7e",
+     "bin_size": 3888,
+     "rel_sha256": "da8d9bfa4fe2e8a9d950307a19466aa0cc1500ae358e37666564dec09ad510e9",
+     "rel_size": 316,
+     "rilocazioni": 70,
+     "basi": 1
+    },
+    "lizard": {
+     "bin_sha256": "4dd52335a111e5d1c1fda4861b59ab7b30c713e97d311e40f0ad893a93647a05",
+     "bin_size": 27116,
+     "rel_sha256": "1024e881271f3b65303f13b970a752978fd811bdbecb4113aeb8c9950c6de7ec",
+     "rel_size": 1808,
+     "rilocazioni": 424,
+     "basi": 1
+    },
+    "plane": {
+     "bin_sha256": "2755e8a99130cf25ca7d3b0ec0271a2a9fad45f3bf7d4b69fb47d09a8b2e4ffe",
+     "bin_size": 10512,
+     "rel_sha256": "ea4c7c21a87c3486339631a23391a89051a218b34b17be14c5f586b7caf86537",
+     "rel_size": 700,
+     "rilocazioni": 151,
+     "basi": 1
+    },
+    "samurai": {
+     "bin_sha256": "84633024e01f61da1c4083bbc9d5a637d727ceca64cbff7ce8f3dc265364a8af",
+     "bin_size": 12836,
+     "rel_sha256": "861fa0edc7f3030fac022bbbaccb74505a99dc7099d787f3cbed3f881f076492",
+     "rel_size": 832,
+     "rilocazioni": 186,
+     "basi": 1
+    },
+    "sandman": {
+     "bin_sha256": "16307d11854c9ef6ecd47fa8f18ba90d6172520d2caf61996831342cef3cd3f4",
+     "bin_size": 20380,
+     "rel_sha256": "94507960f5b7611eefef65b0896279d63c5b136857afd0f2495265cf40276e8c",
+     "rel_size": 1404,
+     "rilocazioni": 314,
+     "basi": 1
+    },
+    "sandman2": {
+     "bin_sha256": "ab0f9c3ef77b96915f3a686c15c8709c03927eba91c6025b55fcf01affae600d",
+     "bin_size": 22668,
+     "rel_sha256": "ab29096772a0433eaee03d28d2fc6c9ce8d2d76e8890698e6b17ae5bf9651cd0",
+     "rel_size": 1768,
+     "rilocazioni": 404,
+     "basi": 1
+    },
+    "selectro": {
+     "bin_sha256": "c45f7e2af5ad627fe7e0c362aabf7a161efbcb3a1f6c05ce6f2032349923ec12",
+     "bin_size": 25388,
+     "rel_sha256": "97c97b3f5d571d7c077ec80e3cbcb888059023210c71ba0b188d9fd4827dad73",
+     "rel_size": 1676,
+     "rilocazioni": 370,
+     "basi": 1
+    },
+    "sentry": {
+     "bin_sha256": "14adb05b06d1e5d5da627b8c103ec03108b0ca0b3393aabd686cf8b9622a9842",
+     "bin_size": 15116,
+     "rel_sha256": "9fde0fb0d3a60dc79b5bd3abafea35b1c040d4ace390aea5cc4c86d8db7ef2da",
+     "rel_size": 1068,
+     "rilocazioni": 231,
+     "basi": 6
+    },
+    "shell": {
+     "bin_sha256": "d224dc32f26c2ea4425b75bbe0619f0ea56399d210ea3dbb0d29821d7c87f91b",
+     "bin_size": 86728,
+     "rel_sha256": "6bc19d30a68d368cb9a99c097cef0379edcecc4fbccd6d7fa999a9b64a247f7f",
+     "rel_size": 7428,
+     "rilocazioni": 1659,
+     "basi": 1
+    },
+    "shocker": {
+     "bin_sha256": "a354286d1811e318049cbcbcadd4d102c8a56797c53af4e94ffc93fcc895f40b",
+     "bin_size": 19464,
+     "rel_sha256": "87e5ec21ac836669525efef187661b089d9574d4c49be1f2ef81fa5890d14c86",
+     "rel_size": 1152,
+     "rilocazioni": 264,
+     "basi": 1
+    },
+    "smoke": {
+     "bin_sha256": "b838cbe2e167f374a685ee940874de78f4219d92b3070fbe205e4a27f91c10c0",
+     "bin_size": 3056,
+     "rel_sha256": "34642d3def0fab440607b48d7ff8c79d9d1ba2c2fc7a51a94d6468526a328d5b",
+     "rel_size": 172,
+     "rilocazioni": 33,
+     "basi": 2
+    },
+    "specweb": {
+     "bin_sha256": "e7903b117a3fd9b948a4eb50d9939c572112e81b1994879b6cd52c030962d820",
+     "bin_size": 20292,
+     "rel_sha256": "fe55e93e7b514c6a92aa4b957cf0b42eb89897a389f11edba2e16aeaf6a92cd3",
+     "rel_size": 980,
+     "rilocazioni": 202,
+     "basi": 8
+    },
+    "srchlght": {
+     "bin_sha256": "d2ac70c52765f4ed66129309b217dc6b48e384f10c061fc444ec4dfb08c6778b",
+     "bin_size": 6148,
+     "rel_sha256": "cd763f00643411e81302112f0e297266141b1566f79570451096018f315e12ef",
+     "rel_size": 168,
+     "rilocazioni": 36,
+     "basi": 1
+    },
+    "terminal": {
+     "bin_sha256": "d687811aa4a1f922ea725988f2a459441c1a000404f56aafdaf943e2fba13691",
+     "bin_size": 19376,
+     "rel_sha256": "5187ad3caad7072c9b4636c7c48514ca26dfc6cc9501bac59064f64fd5402b66",
+     "rel_size": 1800,
+     "rilocazioni": 372,
+     "basi": 3
+    },
+    "thermo": {
+     "bin_sha256": "9f36b173e64d9657f2f00867cfda64097a856a91c8cf3a18b0f5c09179c03add",
+     "bin_size": 1232,
+     "rel_sha256": "d58562d579c391dfc864111905e1f91092f288f1e7d271daa9b9198806112d86",
+     "rel_size": 76,
+     "rilocazioni": 14,
+     "basi": 1
+    },
+    "thug": {
+     "bin_sha256": "2ece9ec50588f24c3ceeab28c3172efc2c5b184765db8c58f8dd368b14c05c77",
+     "bin_size": 58816,
+     "rel_sha256": "b43a416953fd426118cd9ac05c3efdbe1ea30b2992cd402f21a8ceb5a0694310",
+     "rel_size": 4456,
+     "rilocazioni": 1027,
+     "basi": 18
+    },
+    "training": {
+     "bin_sha256": "a162e06875d5604244e14cfb5724b4e49cc332b1367f9eb8bb3ff468f79f81a6",
+     "bin_size": 3720,
+     "rel_sha256": "9bce3fbdc22f752fbb50ac5571619326d16c467582319f018b4da33458e9e764",
+     "rel_size": 504,
+     "rilocazioni": 103,
+     "basi": 2
+    },
+    "turret": {
+     "bin_sha256": "2edb1b5d0a81f430ad13849af5b20cf1e3011596960be1b94407e83c7beb2a8c",
+     "bin_size": 9764,
+     "rel_sha256": "b9b6ba9d5edd382de5845d2faa142f6239987c176ce85d6667475cfb4c1fd3ce",
+     "rel_size": 636,
+     "rilocazioni": 130,
+     "basi": 4
+    },
+    "waterpmp": {
+     "bin_sha256": "4ace13c72b8e9dffef2b3330f202c1fa03bf4a22dc3d626634bf3d6f6f6015eb",
+     "bin_size": 1952,
+     "rel_sha256": "a67876ae2552d14eede158557e907e9637e37f566f326d9c99c9e7fc0f55deee",
+     "rel_size": 76,
+     "rilocazioni": 14,
+     "basi": 1
+    },
+    "xmen": {
+     "bin_sha256": "cc6b1a8acecbe98b73f6a80f7e07ff8584822a1e5b12c9c5f78398d999a09b39",
+     "bin_size": 7464,
+     "rel_sha256": "2bf5c9dd6975685daaeb69bb2d9958ea569104ee0157a366fd503d367c301314",
+     "rel_size": 604,
+     "rilocazioni": 136,
+     "basi": 8
+    }
+   }
+  }
+ }
+}

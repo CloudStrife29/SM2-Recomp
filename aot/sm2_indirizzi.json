@@ -1,0 +1,948 @@
+{
+ "_nota": "Generato da tools/mappa_versioni.py il 2026-10-27 03:48. Indirizzi di RAM del gioco per versione, ricavati da USA Rev 1: solo fatti, nessun byte del gioco.",
+ "SLUS-01378-Rev1": {
+  "exe_sha256": "c121fd42dba9dc0694a83033dd17683149072c086c671db3b9139ccd38f232ec",
+  "entry": "0x80093C68",
+  "gp": "0x800C1764",
+  "funzioni_uguali_a_usa_rev1": 1548,
+  "indirizzi": {
+   "MODELLO": {
+    "valore": "0x800A1AE0",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TEMPLATE_NAME": {
+    "valore": "0x800A1AE4",
+    "come": "da 0x800A1AE0+4, 2 voti su 2"
+   },
+   "DATI_PARTITA": {
+    "valore": "0x800B3180",
+    "come": "esatto, 45 voti su 45"
+   },
+   "CUR_LEVEL": {
+    "valore": "0x800B3184",
+    "come": "esatto, 12 voti su 12"
+   },
+   "SAVE_NAME": {
+    "valore": "0x800B31BF",
+    "come": "da 0x800B318D+50, 2 voti su 2"
+   },
+   "TABELLA_LIVELLI": {
+    "valore": "0x800A3638",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TESTI": {
+    "valore": "0x800A382C",
+    "come": "esatto, 26 voti su 26"
+   },
+   "TASTI": {
+    "valore": "0x800B29C8",
+    "come": "esatto, 57 voti su 57"
+   },
+   "CRC": {
+    "valore": "0x800A6B64",
+    "come": "esatto, 2 voti su 2"
+   },
+   "SPAZI_SALVATAGGIO": {
+    "valore": "0x800A2BE0",
+    "come": "da 0x800A2A60+384, 1 voti su 1"
+   },
+   "MOD_HEAD": {
+    "valore": "0x800C1D74",
+    "come": "gp+1552 -> gp+1552, 7 voti su 7"
+   },
+   "EXIT_STATE": {
+    "valore": "0x800C1F90",
+    "come": "gp+2092 -> gp+2092, 6 voti su 6"
+   },
+   "DIFFICOLTA": {
+    "valore": "0x800C1F9C",
+    "come": "gp+2104 -> gp+2104, 4 voti su 4"
+   },
+   "SELEZIONE_LIVELLI": {
+    "valore": "0x800C1FD8",
+    "come": "assoluto, esatto, 3 voti su 3"
+   }
+  },
+  "funzioni": {
+   "carica_modulo": "0x8001E8E4",
+   "riloca": "0x8001EEF0",
+   "chiama_export": "0x8001EE40",
+   "togli_modulo": "0x8001ED48",
+   "togli_tutti": "0x8001EA90",
+   "allocatore": "0x8007032C",
+   "flusso_principale": "0x80031F48",
+   "ciclo_livello": "0x80031D34",
+   "carica_livello": "0x8001A85C",
+   "interprete_script": "0x80066D74",
+   "domanda_salvataggio": "0x8007A3C4",
+   "game_over": "0x80017940"
+  },
+  "controlli": {
+   "tabella_livelli": [
+    "e1m0_t",
+    "e1m1_t",
+    "e1m2_t",
+    "e1m3_t",
+    "e1m4_t",
+    "e2m1_t",
+    "e2m2_t",
+    "e2m3_t",
+    "e3m0_t",
+    "e3m1_t",
+    "e3m2_t",
+    "e3m3_t",
+    "e4m1_t",
+    "e4m2_t",
+    "e5m1_t",
+    "e5m2_t",
+    "e5m3_t",
+    "e5m4_t",
+    "e5m5_t",
+    "e5m6_t",
+    "e6m1_t",
+    "e6m2_t",
+    "e6m3_t",
+    "e6m4_t"
+   ],
+   "nomi_livelli": [
+    "Enter the Web-Head",
+    "Burglary Interrupted",
+    "Rooftops by Night",
+    "Warehouse 66",
+    "Spidey vs. Shocker",
+    "Smoke Screen",
+    "Hangar 18",
+    "Wind Tunnel",
+    "To Catch a Thief",
+    "In Darkest Night",
+    "Heart of Darkness",
+    "Catch That Train!",
+    "Gangland",
+    "Spidey vs. Hammerhead",
+    "Spidey in the Machine",
+    "Mission: Spidey",
+    "The Corkscrew",
+    "Spidey vs. Lizard",
+    "The Gauntlet",
+    "Spidey vs. Sandman Again",
+    "Konichi-wa Spider-San",
+    "Rock of Ages",
+    "Spidey vs. Electro",
+    "The Best Laid Plans"
+   ],
+   "modello_contiene": "e1m0_t",
+   "livello_e_nome_nei_dati_di_partita": true
+  },
+  "stato": "ok"
+ },
+ "SLUS-01378": {
+  "exe_sha256": "dbe6c3f32337fe0fa7085519c728a75abf5d007b45ea0ba58178bcf84b72908a",
+  "entry": "0x80093C68",
+  "gp": "0x800C1764",
+  "funzioni_uguali_a_usa_rev1": 1537,
+  "indirizzi": {
+   "MODELLO": {
+    "valore": "0x800A1AE0",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TEMPLATE_NAME": {
+    "valore": "0x800A1AE4",
+    "come": "da 0x800A1AE0+4, 2 voti su 2"
+   },
+   "DATI_PARTITA": {
+    "valore": "0x800B3180",
+    "come": "esatto, 29 voti su 29"
+   },
+   "CUR_LEVEL": {
+    "valore": "0x800B3184",
+    "come": "esatto, 7 voti su 7"
+   },
+   "SAVE_NAME": {
+    "valore": "0x800B31BF",
+    "come": "da 0x800B318D+50, 2 voti su 2"
+   },
+   "TABELLA_LIVELLI": {
+    "valore": "0x800A3638",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TESTI": {
+    "valore": "0x800A382C",
+    "come": "esatto, 26 voti su 26"
+   },
+   "TASTI": {
+    "valore": "0x800B29C8",
+    "come": "esatto, 56 voti su 56"
+   },
+   "CRC": {
+    "valore": "0x800A6B64",
+    "come": "esatto, 2 voti su 2"
+   },
+   "SPAZI_SALVATAGGIO": {
+    "valore": "0x800A2BE0",
+    "come": "da 0x800A2A60+384, 1 voti su 1"
+   },
+   "MOD_HEAD": {
+    "valore": "0x800C1D74",
+    "come": "gp+1552 -> gp+1552, 7 voti su 7"
+   },
+   "EXIT_STATE": {
+    "valore": "0x800C1F90",
+    "come": "gp+2092 -> gp+2092, 5 voti su 5"
+   },
+   "DIFFICOLTA": {
+    "valore": "0x800C1F9C",
+    "come": "assoluto, esatto, 13 voti su 13"
+   },
+   "SELEZIONE_LIVELLI": {
+    "valore": "0x800C1FD8",
+    "come": "assoluto, esatto, 3 voti su 3"
+   }
+  },
+  "funzioni": {
+   "carica_modulo": "0x8001E8E4",
+   "riloca": "0x8001EEF0",
+   "chiama_export": "0x8001EE40",
+   "togli_modulo": "0x8001ED48",
+   "togli_tutti": "0x8001EA90",
+   "allocatore": "0x8007032C",
+   "flusso_principale": null,
+   "ciclo_livello": "0x80031D40",
+   "carica_livello": "0x8001A85C",
+   "interprete_script": "0x80066D84",
+   "domanda_salvataggio": "0x8007A3C4",
+   "game_over": "0x80017940"
+  },
+  "controlli": {
+   "tabella_livelli": [
+    "e1m0_t",
+    "e1m1_t",
+    "e1m2_t",
+    "e1m3_t",
+    "e1m4_t",
+    "e2m1_t",
+    "e2m2_t",
+    "e2m3_t",
+    "e3m0_t",
+    "e3m1_t",
+    "e3m2_t",
+    "e3m3_t",
+    "e4m1_t",
+    "e4m2_t",
+    "e5m1_t",
+    "e5m2_t",
+    "e5m3_t",
+    "e5m4_t",
+    "e5m5_t",
+    "e5m6_t",
+    "e6m1_t",
+    "e6m2_t",
+    "e6m3_t",
+    "e6m4_t"
+   ],
+   "nomi_livelli": [
+    "Enter the Web-Head",
+    "Burglary Interrupted",
+    "Rooftops by Night",
+    "Warehouse 66",
+    "Spidey vs. Shocker",
+    "Smoke Screen",
+    "Hangar 18",
+    "Crash Flight!",
+    "To Catch a Thief",
+    "In Darkest Night",
+    "Heart of Darkness",
+    "Catch That Train!",
+    "Gangland",
+    "Spidey vs. Hammerhead",
+    "Spidey in the Machine",
+    "Mission: Spidey",
+    "Downward Spiral",
+    "Spidey vs. Lizard",
+    "Aces High",
+    "Spidey vs. Sandman Again",
+    "Konichi-wa Spider-San",
+    "Rock of Ages",
+    "Spidey vs. Electro",
+    "Top of the World"
+   ],
+   "modello_contiene": "e1m0_t",
+   "livello_e_nome_nei_dati_di_partita": true
+  },
+  "stato": "ok"
+ },
+ "SLES-03623": {
+  "exe_sha256": "66ad0f8c9d23d2ce627907f5c55d6e1aa345370a9ef5374670f35a1e0261c32d",
+  "entry": "0x80093F50",
+  "gp": "0x800C1964",
+  "funzioni_uguali_a_usa_rev1": 1518,
+  "indirizzi": {
+   "MODELLO": {
+    "valore": "0x800A1CE0",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TEMPLATE_NAME": {
+    "valore": "0x800A1CE4",
+    "come": "da 0x800A1AE0+4, 2 voti su 2"
+   },
+   "DATI_PARTITA": {
+    "valore": "0x800B3380",
+    "come": "esatto, 27 voti su 27"
+   },
+   "CUR_LEVEL": {
+    "valore": "0x800B3384",
+    "come": "esatto, 5 voti su 5"
+   },
+   "SAVE_NAME": {
+    "valore": "0x800B33BF",
+    "come": "da 0x800B318D+50, 2 voti su 2"
+   },
+   "TABELLA_LIVELLI": {
+    "valore": "0x800A3838",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TESTI": {
+    "valore": "0x800A3A2C",
+    "come": "esatto, 26 voti su 26"
+   },
+   "TASTI": {
+    "valore": "0x800B2BC8",
+    "come": "esatto, 48 voti su 48"
+   },
+   "CRC": {
+    "valore": "0x800A6D64",
+    "come": "esatto, 2 voti su 2"
+   },
+   "SPAZI_SALVATAGGIO": {
+    "valore": "0x800A2DE0",
+    "come": "da 0x800A29E0+512, 3 voti su 3"
+   },
+   "MOD_HEAD": {
+    "valore": "0x800C1F74",
+    "come": "gp+1552 -> gp+1552, 7 voti su 7"
+   },
+   "EXIT_STATE": {
+    "valore": "0x800C2190",
+    "come": "gp+2092 -> gp+2092, 5 voti su 5"
+   },
+   "DIFFICOLTA": {
+    "valore": "0x800C219C",
+    "come": "assoluto, esatto, 13 voti su 13"
+   },
+   "SELEZIONE_LIVELLI": {
+    "valore": "0x800C21D8",
+    "come": "assoluto, esatto, 3 voti su 3"
+   }
+  },
+  "funzioni": {
+   "carica_modulo": "0x8001E8AC",
+   "riloca": "0x8001EEB8",
+   "chiama_export": "0x8001EE08",
+   "togli_modulo": "0x8001ED10",
+   "togli_tutti": "0x8001EA58",
+   "allocatore": "0x800704F4",
+   "flusso_principale": null,
+   "ciclo_livello": "0x80031D1C",
+   "carica_livello": "0x8001A824",
+   "interprete_script": null,
+   "domanda_salvataggio": "0x8007A6AC",
+   "game_over": "0x80017908"
+  },
+  "controlli": {
+   "tabella_livelli": [
+    "e1m0_t",
+    "e1m1_t",
+    "e1m2_t",
+    "e1m3_t",
+    "e1m4_t",
+    "e2m1_t",
+    "e2m2_t",
+    "e2m3_t",
+    "e3m0_t",
+    "e3m1_t",
+    "e3m2_t",
+    "e3m3_t",
+    "e4m1_t",
+    "e4m2_t",
+    "e5m1_t",
+    "e5m2_t",
+    "e5m3_t",
+    "e5m4_t",
+    "e5m5_t",
+    "e5m6_t",
+    "e6m1_t",
+    "e6m2_t",
+    "e6m3_t",
+    "e6m4_t"
+   ],
+   "nomi_livelli": [
+    "Enter the Web-Head",
+    "Burglary Interrupted",
+    "Rooftops by Night",
+    "Warehouse 66",
+    "Spidey vs. Shocker",
+    "Smoke Screen",
+    "Hangar 18",
+    "Crash Flight!",
+    "To Catch a Thief",
+    "In Darkest Night",
+    "Heart of Darkness",
+    "Catch That Train!",
+    "Gangland",
+    "Spidey vs. Hammerhead",
+    "Spidey in the Machine",
+    "Mission: Spidey",
+    "Downward Spiral",
+    "Spidey vs. Lizard",
+    "Aces High",
+    "Spidey vs. Sandman Again",
+    "Konichi-wa Spider-San",
+    "Rock of Ages",
+    "Spidey vs. Electro",
+    "Top of the World"
+   ],
+   "modello_contiene": "e1m0_t",
+   "livello_e_nome_nei_dati_di_partita": true
+  },
+  "stato": "ok"
+ },
+ "SLES-03623-Rev1": {
+  "exe_sha256": "9afb2d62b0238f17463a2652e63feb6f98311aa97a3c38da80dc8e311b7b5b83",
+  "entry": "0x80094960",
+  "gp": "0x800C2374",
+  "funzioni_uguali_a_usa_rev1": 1478,
+  "indirizzi": {
+   "MODELLO": {
+    "valore": "0x800A26F0",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TEMPLATE_NAME": {
+    "valore": "0x800A26F4",
+    "come": "da 0x800A1AE0+4, 2 voti su 2"
+   },
+   "DATI_PARTITA": {
+    "valore": "0x800B3D90",
+    "come": "esatto, 34 voti su 34"
+   },
+   "CUR_LEVEL": {
+    "valore": "0x800B3D94",
+    "come": "esatto, 10 voti su 10"
+   },
+   "SAVE_NAME": {
+    "valore": "0x800B3DCF",
+    "come": "da 0x800B318D+50, 2 voti su 2"
+   },
+   "TABELLA_LIVELLI": {
+    "valore": "0x800A4248",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TESTI": {
+    "valore": "0x800A443C",
+    "come": "esatto, 26 voti su 26"
+   },
+   "TASTI": {
+    "valore": "0x800B35D8",
+    "come": "esatto, 48 voti su 48"
+   },
+   "CRC": {
+    "valore": "0x800A7774",
+    "come": "esatto, 2 voti su 2"
+   },
+   "SPAZI_SALVATAGGIO": {
+    "valore": "0x800A37F0",
+    "come": "da 0x800A29E0+512, 3 voti su 3"
+   },
+   "MOD_HEAD": {
+    "valore": "0x800C2984",
+    "come": "gp+1552 -> gp+1552, 7 voti su 7"
+   },
+   "EXIT_STATE": {
+    "valore": "0x800C2BA0",
+    "come": "gp+2092 -> gp+2092, 6 voti su 6"
+   },
+   "DIFFICOLTA": {
+    "valore": "0x800C2BAC",
+    "come": "gp+2104 -> gp+2104, 4 voti su 4"
+   },
+   "SELEZIONE_LIVELLI": {
+    "valore": "0x800C2BE8",
+    "come": "assoluto, esatto, 3 voti su 3"
+   }
+  },
+  "funzioni": {
+   "carica_modulo": "0x8001E920",
+   "riloca": "0x8001EF2C",
+   "chiama_export": "0x8001EE7C",
+   "togli_modulo": "0x8001ED84",
+   "togli_tutti": "0x8001EACC",
+   "allocatore": "0x80070F00",
+   "flusso_principale": "0x8003217C",
+   "ciclo_livello": "0x80031F68",
+   "carica_livello": "0x8001A888",
+   "interprete_script": null,
+   "domanda_salvataggio": "0x8007B0BC",
+   "game_over": "0x8001796C"
+  },
+  "controlli": {
+   "tabella_livelli": [
+    "e1m0_t",
+    "e1m1_t",
+    "e1m2_t",
+    "e1m3_t",
+    "e1m4_t",
+    "e2m1_t",
+    "e2m2_t",
+    "e2m3_t",
+    "e3m0_t",
+    "e3m1_t",
+    "e3m2_t",
+    "e3m3_t",
+    "e4m1_t",
+    "e4m2_t",
+    "e5m1_t",
+    "e5m2_t",
+    "e5m3_t",
+    "e5m4_t",
+    "e5m5_t",
+    "e5m6_t",
+    "e6m1_t",
+    "e6m2_t",
+    "e6m3_t",
+    "e6m4_t"
+   ],
+   "nomi_livelli": [
+    "Enter the Web-Head",
+    "Burglary Interrupted",
+    "Rooftops by Night",
+    "Warehouse 66",
+    "Spidey vs. Shocker",
+    "Smoke Screen",
+    "Hangar 18",
+    "Wind Tunnel",
+    "To Catch a Thief",
+    "In Darkest Night",
+    "Heart of Darkness",
+    "Catch That Train!",
+    "Gangland",
+    "Spidey vs. Hammerhead",
+    "Spidey in the Machine",
+    "Mission: Spidey",
+    "The Corkscrew",
+    "Spidey vs. Lizard",
+    "The Gauntlet",
+    "Spidey vs. Sandman Again",
+    "Konichi-wa Spider-San",
+    "Rock of Ages",
+    "Spidey vs. Electro",
+    "The Best Laid Plans"
+   ],
+   "modello_contiene": "e1m0_t",
+   "livello_e_nome_nei_dati_di_partita": true
+  },
+  "stato": "ok"
+ },
+ "SLES-03624": {
+  "exe_sha256": "b26f66bd1b4cef58de7051d0726c12cfd201086354519818b122c14bfcc2ee7e",
+  "entry": "0x80094970",
+  "gp": "0x800C26B8",
+  "funzioni_uguali_a_usa_rev1": 1475,
+  "indirizzi": {
+   "MODELLO": {
+    "valore": "0x800A29D0",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TEMPLATE_NAME": {
+    "valore": "0x800A29D4",
+    "come": "da 0x800A1AE0+4, 2 voti su 2"
+   },
+   "DATI_PARTITA": {
+    "valore": "0x800B40D4",
+    "come": "esatto, 34 voti su 34"
+   },
+   "CUR_LEVEL": {
+    "valore": "0x800B40D8",
+    "come": "esatto, 10 voti su 10"
+   },
+   "SAVE_NAME": {
+    "valore": "0x800B4113",
+    "come": "da 0x800B318D+50, 2 voti su 2"
+   },
+   "TABELLA_LIVELLI": {
+    "valore": "0x800A4588",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TESTI": {
+    "valore": "0x800A477C",
+    "come": "esatto, 20 voti su 20"
+   },
+   "TASTI": {
+    "valore": "0x800B391C",
+    "come": "esatto, 46 voti su 46"
+   },
+   "CRC": {
+    "valore": "0x800A7AB8",
+    "come": "esatto, 2 voti su 2"
+   },
+   "SPAZI_SALVATAGGIO": {
+    "valore": "0x800A3B30",
+    "come": "da 0x800A29E0+512, 3 voti su 3"
+   },
+   "MOD_HEAD": {
+    "valore": "0x800C2C34",
+    "come": "gp+1552 -> gp+1404, 7 voti su 7"
+   },
+   "EXIT_STATE": {
+    "valore": "0x800C2E50",
+    "come": "gp+2092 -> gp+1944, 6 voti su 6"
+   },
+   "DIFFICOLTA": {
+    "valore": "0x800C2E5C",
+    "come": "gp+2104 -> gp+1956, 4 voti su 4"
+   },
+   "SELEZIONE_LIVELLI": {
+    "valore": "0x800C2E98",
+    "come": "assoluto, esatto, 3 voti su 3"
+   }
+  },
+  "funzioni": {
+   "carica_modulo": "0x8001E978",
+   "riloca": "0x8001EF84",
+   "chiama_export": "0x8001EED4",
+   "togli_modulo": "0x8001EDDC",
+   "togli_tutti": "0x8001EB24",
+   "allocatore": "0x80070F4C",
+   "flusso_principale": "0x800321D4",
+   "ciclo_livello": "0x80031FC0",
+   "carica_livello": "0x8001A860",
+   "interprete_script": null,
+   "domanda_salvataggio": "0x8007B108",
+   "game_over": "0x8001796C"
+  },
+  "controlli": {
+   "tabella_livelli": [
+    "e1m0_t",
+    "e1m1_t",
+    "e1m2_t",
+    "e1m3_t",
+    "e1m4_t",
+    "e2m1_t",
+    "e2m2_t",
+    "e2m3_t",
+    "e3m0_t",
+    "e3m1_t",
+    "e3m2_t",
+    "e3m3_t",
+    "e4m1_t",
+    "e4m2_t",
+    "e5m1_t",
+    "e5m2_t",
+    "e5m3_t",
+    "e5m4_t",
+    "e5m5_t",
+    "e5m6_t",
+    "e6m1_t",
+    "e6m2_t",
+    "e6m3_t",
+    "e6m4_t"
+   ],
+   "nomi_livelli": [
+    "LA TOILE DE L'ARAIGNEE",
+    "LA MAIN DANS LE SAC",
+    "UNE NUIT SUR LES TOITS",
+    "ENTREPOT 66",
+    "SPIDER-MAN CONTRE SCHOCKER",
+    "UN ECRAN DE FUMEE",
+    "HANGAR 18",
+    "La soufflerie",
+    "AU VOLEUR !",
+    "NUIT NOIRE",
+    "AU COEUR DES TENEBRES",
+    "ATTRAPE CE TRAIN",
+    "MAFIA LAND",
+    "SPIDER-MAN CONTRE HAMMERHEAD",
+    "HOMME CONTRE MACHINE",
+    "MISSION : SPIDER-MAN",
+    "Le tire-bouchon",
+    "SPIDER-MAN CONTRE LE LEZARD",
+    "Le d\u00e9fi",
+    "SPIDER-MAN CONTRE L'HOMME-SABLE",
+    "KONICHI-WA SPIDER-SAN",
+    "LE MUSEUM",
+    "SPIDER-MAN CONTRE ELECTRO",
+    "Un plan presque parfait"
+   ],
+   "modello_contiene": "e1m0_t",
+   "livello_e_nome_nei_dati_di_partita": true
+  },
+  "stato": "ok"
+ },
+ "SLES-03625": {
+  "exe_sha256": "093a46b56be346c53bbd6d56134bc5696f2c9f0cacecbc15eb8d3c8d988f60d7",
+  "entry": "0x800949E8",
+  "gp": "0x800C24E4",
+  "funzioni_uguali_a_usa_rev1": 1477,
+  "indirizzi": {
+   "MODELLO": {
+    "valore": "0x800A2828",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TEMPLATE_NAME": {
+    "valore": "0x800A282C",
+    "come": "da 0x800A1AE0+4, 2 voti su 2"
+   },
+   "DATI_PARTITA": {
+    "valore": "0x800B3F00",
+    "come": "esatto, 34 voti su 34"
+   },
+   "CUR_LEVEL": {
+    "valore": "0x800B3F04",
+    "come": "esatto, 10 voti su 10"
+   },
+   "SAVE_NAME": {
+    "valore": "0x800B3F3F",
+    "come": "da 0x800B318D+50, 2 voti su 2"
+   },
+   "TABELLA_LIVELLI": {
+    "valore": "0x800A43B8",
+    "come": "esatto, 2 voti su 2"
+   },
+   "TESTI": {
+    "valore": "0x800A45AC",
+    "come": "esatto, 26 voti su 26"
+   },
+   "TASTI": {
+    "valore": "0x800B3748",
+    "come": "esatto, 48 voti su 48"
+   },
+   "CRC": {
+    "valore": "0x800A78E4",
+    "come": "esatto, 2 voti su 2"
+   },
+   "SPAZI_SALVATAGGIO": {
+    "valore": "0x800A3960",
+    "come": "da 0x800A29E0+512, 3 voti su 3"
+   },
+   "MOD_HEAD": {
+    "valore": "0x800C2A68",
+    "come": "gp+1552 -> gp+1412, 7 voti su 7"
+   },
+   "EXIT_STATE": {
+    "valore": "0x800C2C84",
+    "come": "gp+2092 -> gp+1952, 6 voti su 6"
+   },
+   "DIFFICOLTA": {
+    "valore": "0x800C2C90",
+    "come": "gp+2104 -> gp+1964, 4 voti su 4"
+   },
+   "SELEZIONE_LIVELLI": {
+    "valore": "0x800C2CCC",
+    "come": "assoluto, esatto, 3 voti su 3"
+   }
+  },
+  "funzioni": {
+   "carica_modulo": "0x8001E9A0",
+   "riloca": "0x8001EFAC",
+   "chiama_export": "0x8001EEFC",
+   "togli_modulo": "0x8001EE04",
+   "togli_tutti": "0x8001EB4C",
+   "allocatore": "0x80070F84",
+   "flusso_principale": "0x800321FC",
+   "ciclo_livello": "0x80031FE8",
+   "carica_livello": "0x8001A888",
+   "interprete_script": null,
+   "domanda_salvataggio": "0x8007B144",
+   "game_over": "0x8001796C"
+  },
+  "controlli": {
+   "tabella_livelli": [
+    "e1m0_t",
+    "e1m1_t",
+    "e1m2_t",
+    "e1m3_t",
+    "e1m4_t",
+    "e2m1_t",
+    "e2m2_t",
+    "e2m3_t",
+    "e3m0_t",
+    "e3m1_t",
+    "e3m2_t",
+    "e3m3_t",
+    "e4m1_t",
+    "e4m2_t",
+    "e5m1_t",
+    "e5m2_t",
+    "e5m3_t",
+    "e5m4_t",
+    "e5m5_t",
+    "e5m6_t",
+    "e6m1_t",
+    "e6m2_t",
+    "e6m3_t",
+    "e6m4_t"
+   ],
+   "nomi_livelli": [
+    "Neues vom Netzschwinger",
+    "Verhinderter Einbruch",
+    "Nachts \u00fcber den D\u00e4chern",
+    "Lagerhaus 66",
+    "Spidey gegen Schocker",
+    "Rauchglas",
+    "Hangar 18",
+    "Windkanal",
+    "Ins Netz gegangen",
+    "Finsterste Nacht",
+    "Herz der Finsternis",
+    "Spidey am Zug",
+    "Gang-Land",
+    "Spidey gegen Hammerhead",
+    "Spidey in der Maschine",
+    "Mission: Spidey",
+    "Der Korkenzieher",
+    "Spidey gegen die Echse",
+    "Der Spie\u00dfrutenlauf",
+    "Spidey gegen Sandman 2",
+    "Konichi-Wa Spider-San",
+    "Geschichtsstunde",
+    "Spidey gegen Electro",
+    "Ein perfekter Plan"
+   ],
+   "modello_contiene": "e1m0_t",
+   "livello_e_nome_nei_dati_di_partita": true
+  },
+  "stato": "ok"
+ },
+ "SLPM-87073": {
+  "exe_sha256": "1569dc1bf4294ade9f5020bfde518c35772fbf7adb829f2a05621766fa3dcb29",
+  "entry": "0x800946EC",
+  "gp": "0x800C3278",
+  "funzioni_uguali_a_usa_rev1": 575,
+  "indirizzi": {
+   "MODELLO": {
+    "valore": "0x800A2B34",
+    "come": "da 0x800A1AB0+48, 1 voti su 1"
+   },
+   "TEMPLATE_NAME": {
+    "valore": "0x800A2B38",
+    "come": "da 0x800A1AB0+52, 1 voti su 1"
+   },
+   "DATI_PARTITA": {
+    "valore": "0x800B4524",
+    "come": "da 0x800B3130+80, 1 voti su 1"
+   },
+   "CUR_LEVEL": {
+    "valore": "0x800B4528",
+    "come": "da 0x800B3130+84, 1 voti su 1"
+   },
+   "SAVE_NAME": {
+    "valore": "0x800B4563",
+    "come": "da 0x800B3130+143, 1 voti su 1"
+   },
+   "TABELLA_LIVELLI": {
+    "valore": "0x800A46D4",
+    "come": "cercata per contenuto (puntatore a \"e1m0_t\")"
+   },
+   "TESTI": {
+    "valore": null,
+    "come": "nessun riferimento vicino"
+   },
+   "TASTI": {
+    "valore": null,
+    "come": "nessun riferimento vicino"
+   },
+   "CRC": {
+    "valore": null,
+    "come": "nessun riferimento vicino"
+   },
+   "SPAZI_SALVATAGGIO": {
+    "valore": null,
+    "come": "nessun riferimento vicino"
+   },
+   "MOD_HEAD": {
+    "valore": "0x800C3878",
+    "come": "gp+1552 -> gp+1536, 4 voti su 4"
+   },
+   "EXIT_STATE": {
+    "valore": "0x800C3A94",
+    "come": "assoluto, da 0x800C1F68+40, 1 voti su 1"
+   },
+   "DIFFICOLTA": {
+    "valore": "0x800C3AA0",
+    "come": "assoluto, esatto, 3 voti su 3"
+   },
+   "SELEZIONE_LIVELLI": {
+    "valore": "0x800C3ADC",
+    "come": "assoluto, da 0x800C1FAC+44, 2 voti su 2"
+   }
+  },
+  "funzioni": {
+   "carica_modulo": null,
+   "riloca": null,
+   "chiama_export": "0x8001EF80",
+   "togli_modulo": "0x8001EE88",
+   "togli_tutti": null,
+   "allocatore": null,
+   "flusso_principale": null,
+   "ciclo_livello": null,
+   "carica_livello": null,
+   "interprete_script": null,
+   "domanda_salvataggio": null,
+   "game_over": null
+  },
+  "controlli": {
+   "tabella_livelli": [
+    "e1m0_t",
+    "e1m1_t",
+    "e1m2_t",
+    "e1m3_t",
+    "e1m4_t",
+    "e2m1_t",
+    "e2m2_t",
+    "e2m3_t",
+    "e3m0_t",
+    "e3m1_t",
+    "e3m2_t",
+    "e3m3_t",
+    "e4m1_t",
+    "e4m2_t",
+    "e5m1_t",
+    "e5m2_t",
+    "e5m3_t",
+    "e5m4_t",
+    "e5m5_t",
+    "e5m6_t",
+    "e6m1_t",
+    "e6m2_t",
+    "e6m3_t",
+    "e6m4_t"
+   ],
+   "nomi_livelli": [
+    "Enter the Web-Head",
+    "Burglary Interrupted",
+    "Rooftops by Night",
+    "Warehouse 66",
+    "Spidey vs. Shocker",
+    "Smoke Screen",
+    "Hangar 18",
+    "Wind Tunnel",
+    "To Catch a Thief",
+    "In Darkest Night",
+    "Heart of Darkness",
+    "Catch That Train!",
+    "Gangland",
+    "Spidey vs. Hammerhead",
+    "Spidey in the Machine",
+    "Mission: Spidey",
+    "The Corkscrew",
+    "Spidey vs. Lizard",
+    "The Gauntlet",
+    "Spidey vs. Sandman Again",
+    "Konichi-wa Spider-San",
+    "Rock of Ages",
+    "Spidey vs. Electro",
+    "The Best Laid Plans"
+   ],
+   "modello_contiene": "e1m0_t",
+   "livello_e_nome_nei_dati_di_partita": true
+  },
+  "stato": "da verificare: EXIT_STATE, DATI_PARTITA, CUR_LEVEL, SAVE_NAME"
+ }
+}
