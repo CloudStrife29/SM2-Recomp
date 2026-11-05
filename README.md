@@ -100,6 +100,6 @@ SM2-Launcher.cmd status
 
 The SM2-Recomp launcher is under the MIT license (`LICENSE`). The package also contains psxrecomp, recomp-ui and the build tools, each with its own license: because of psxrecomp's license, the package may be used and distributed **only free of charge and for non-commercial purposes**; for the build-tool programs under the GPL or LGPL, the sources are in `tools\toolchain\sorgenti\`. The details are in `LICENSES.md` (in Italian: `LICENZE.md`); in the package, `PACCHETTO.txt` lists all the files with their SHA-256 hashes.
 
-Status: prototype. In all 7 versions the game reaches gameplay from the recompiled code, and in the automated tests all 44 levels start, with the precompiled level modules. The game has not yet been played by a player from start to finish.
+Status: playable,good gameplay. In all 7 versions the game reaches gameplay from the recompiled code, and in the automated tests all 44 levels start, with the precompiled level modules. The game has been played by a player from start to finish with no issues.
 
 The next development steps are in `ROADMAP.md`.
