@@ -1,8 +1,8 @@
 # SM2-Recomp
 
-> **Per giocare scarica il pacchetto dalla pagina [Releases](https://github.com/CloudStrife29/SM2-Recomp/releases)** (istruzioni in italiano in `LEGGIMI.md`). Lo zip contiene anche psxrecomp (con le modifiche descritte in `psxrecomp_modifiche.patch`), recomp-ui e gli strumenti di compilazione, che in questo repository non ci sono: qui ci sono il launcher, i documenti e le licenze.
+> **Per giocare scarica il pacchetto completo dalla pagina [Releases](https://github.com/CloudStrife29/SM2-Recomp/releases)**: è il file `SM2-Recomp-<versione>.zip` nella sezione «Assets» della release (istruzioni in italiano in `LEGGIMI.md`). Lo zip contiene anche psxrecomp (con le modifiche descritte in `psxrecomp_modifiche.patch`), recomp-ui e gli strumenti di compilazione, che in questo repository non ci sono: qui ci sono il launcher, i documenti e le licenze. «Code → Download ZIP» e gli archivi «Source code» che GitHub aggiunge a ogni release contengono solo questo repository, senza psxrecomp, recomp-ui e gli strumenti di compilazione: con quelli il launcher non può installare il gioco.
 >
-> **To play, download the package from the [Releases](https://github.com/CloudStrife29/SM2-Recomp/releases) page.** The zip also contains psxrecomp (with the changes described in `psxrecomp_modifiche.patch`), recomp-ui and the build tools, which are not in this repository: here are the launcher, the documents and the licenses.
+> **To play, download the complete package from the [Releases](https://github.com/CloudStrife29/SM2-Recomp/releases) page**: it is the `SM2-Recomp-<version>.zip` file in the "Assets" section of the release. The zip also contains psxrecomp (with the changes described in `psxrecomp_modifiche.patch`), recomp-ui and the build tools, which are not in this repository: here are the launcher, the documents and the licenses. "Code → Download ZIP" and the "Source code" archives that GitHub adds to every release contain only this repository, without psxrecomp, recomp-ui and the build tools: with them the launcher cannot install the game.
 
 Italiano: vedi LEGGIMI.md.
 
@@ -14,7 +14,7 @@ The project **contains nothing from the game**: neither data nor translated code
 
 - Windows 10 or 11, 64-bit.
 - Free space: about 350 MB for the extracted package, about 1 GB for the build tools (they set themselves up at the first start) and up to about 3 GB for each installed version.
-- **No internet connection is needed.** The complete package already contains everything: the build tools (about 200 MB, always version 1.0.14, checked against its SHA-256 hash) and the library that earlier versions downloaded at the first build. Internet is only needed by those who download the project with `git clone` instead of the package: in that case the tools are downloaded at the first start.
+- **No internet connection is needed.** The complete package already contains everything: the build tools (about 200 MB, always version 1.0.14, checked against its SHA-256 hash) and the library that earlier versions downloaded at the first build. This repository on its own (`git clone`, "Code → Download ZIP" or the "Source code" archives) is not enough: psxrecomp, recomp-ui and the build tools are only in the package.
 - A complete dump of your Spider-Man 2: Enter Electro disc (2352-byte sectors):
   - `.bin` + `.cue`, also with several tracks;
   - CloneCD `.img` + `.ccd` (+ `.sub`);
@@ -38,7 +38,7 @@ The version is recognized from the executable on the disc. The launcher also tel
 
 ## How to use it
 
-1. Extract the package zip (`SM2-Recomp-<version>.zip`, about 270 MB) into a folder with a short path, for example `C:\Games\SM2-Recomp`: the build creates files with long names. Alternatively, download the project with its submodules: `git clone --recursive …` (in that case, though, the first start needs an internet connection).
+1. Download the package zip (`SM2-Recomp-<version>.zip`, about 270 MB) from the [Releases](https://github.com/CloudStrife29/SM2-Recomp/releases) page and extract it into a folder with a short path, for example `C:\Games\SM2-Recomp`: the build creates files with long names.
 2. Double-click **`SM2-Launcher.cmd`**. The first time, it prepares the build tools in `tools\toolchain\cmake-clang-v1\` by extracting them from the zip that is already in the package: about a minute, with no internet. It installs nothing in the system and does not change the Windows PATH or registry.
 3. The launcher window opens:
    - **Add a disc...**: choose the `.cue` (or `.ccd`, `.bin`) of your dump. The launcher recognizes it and moves it, with all its files, into the folder `input\<version>\`. It never overwrites anything.
@@ -100,6 +100,11 @@ SM2-Launcher.cmd status
 
 The SM2-Recomp launcher is under the MIT license (`LICENSE`). The package also contains psxrecomp, recomp-ui and the build tools, each with its own license: because of psxrecomp's license, the package may be used and distributed **only free of charge and for non-commercial purposes**; for the build-tool programs under the GPL or LGPL, the sources are in `tools\toolchain\sorgenti\`. The details are in `LICENSES.md` (in Italian: `LICENZE.md`); in the package, `PACCHETTO.txt` lists all the files with their SHA-256 hashes.
 
-Status: playable,good gameplay. In all 7 versions the game reaches gameplay from the recompiled code, and in the automated tests all 44 levels start, with the precompiled level modules. The game has been played by a player from start to finish with no issues.
+Status: playable, good gameplay. What the project has documented for version 0.11 (in the [0.11 release notes](https://github.com/CloudStrife29/SM2-Recomp/releases/tag/v0.11)):
+
+- **Recognized disc versions:** the 7 in the table above.
+- **Automated tests:** in all 7 versions the game reaches gameplay from the recompiled code, and all 44 levels start, with the precompiled level modules.
+- **Manual test:** a complete playthrough from start to finish with USA Rev 1, on a test laptop (Core i7-6500U, GeForce 920MX). No complete playthrough is documented for the other versions.
+- **Known issues:** listed in the 0.11 release notes and in `ROADMAP.md` ("Known issues to fix").
 
 The next development steps are in `ROADMAP.md`.

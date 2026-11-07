@@ -10,8 +10,7 @@ rem Messaggi in italiano o in inglese (dal 4/11/2026): li sceglie il launcher da
 rem per cambiarla. Qui sotto i messaggi di questo file sono scritti in tutte e due le lingue.
 rem La prima volta prepara il toolchain portatile (llvm-mingw, CMake, Ninja, Python) in tools\toolchain\:
 rem sempre la versione 1.0.14 (launcher 0.11), controllata con il suo SHA-256. Il pacchetto completo (dal 3/11/2026)
-rem contiene gia' lo zip (circa 200 MB) e lo estrae senza internet; se lo zip manca (per esempio con git clone) lo
-rem scarica.
+rem contiene gia' lo zip (circa 200 MB) e lo estrae senza internet; se lo zip manca lo scarica.
 rem Non installa niente nel sistema e non cambia il PATH o il registro di Windows: il toolchain vale
 rem solo per questa finestra.
 rem
@@ -26,14 +25,15 @@ rem Messages in Italian or English: the launcher chooses from the Windows displa
 rem change it. The messages of this file are written below in both languages.
 rem The first time it prepares the portable build tools (llvm-mingw, CMake, Ninja, Python) in tools\toolchain\:
 rem always version 1.0.14 (launcher 0.11), checked with its SHA-256. The complete package already contains the zip
-rem (about 200 MB) and extracts it without internet; if the zip is missing (for example with git clone) it downloads
-rem it. It installs nothing in the system and does not change the Windows PATH or registry: the build tools are
-rem used only in this window.
+rem (about 200 MB) and extracts it without internet; if the zip is missing it downloads it. It installs nothing in
+rem the system and does not change the Windows PATH or registry: the build tools are used only in this window.
 setlocal
 cd /d "%~dp0"
 if not exist "psxrecomp\psxrecomp_cli.py" (
-  echo Manca psxrecomp: scarica il progetto con i sottomoduli ^(git clone --recursive^).
-  echo psxrecomp is missing: download the project with its submodules ^(git clone --recursive^).
+  echo Manca psxrecomp: per giocare scarica il pacchetto completo di SM2-Recomp dalla pagina Releases:
+  echo https://github.com/CloudStrife29/SM2-Recomp/releases ^(il Download ZIP del pulsante Code e gli archivi Source code non bastano^).
+  echo psxrecomp is missing: to play, download the complete SM2-Recomp package from the Releases page:
+  echo https://github.com/CloudStrife29/SM2-Recomp/releases ^(Download ZIP from the Code button and the Source code archives are not enough^).
   goto :fine
 )
 set "TC=tools\toolchain"
