@@ -1,5 +1,7 @@
 # SM2-Recomp
 
+> **Per giocare scarica il pacchetto completo dalla pagina [Releases](https://github.com/CloudStrife29/SM2-Recomp/releases)**: è il file `SM2-Recomp-<versione>.zip` nella sezione «Assets» della release. Lo zip contiene anche psxrecomp (con le modifiche descritte in `psxrecomp_modifiche.patch`), recomp-ui e gli strumenti di compilazione, che in questo repository non ci sono: qui ci sono il launcher, i documenti e le licenze. «Code → Download ZIP» e gli archivi «Source code» che GitHub aggiunge a ogni release contengono solo questo repository, senza psxrecomp, recomp-ui e gli strumenti di compilazione: con quelli il launcher non può installare il gioco.
+
 English: see README.md.
 
 Port nativo per PC di **Spider-Man 2: Enter Electro** (PlayStation, 2001), fatto con la ricompilazione statica di [psxrecomp](https://github.com/mstan/psxrecomp).
@@ -10,7 +12,7 @@ Il progetto **non contiene niente del gioco**: né dati, né codice tradotto. Co
 
 - Windows 10 o 11, 64 bit.
 - Spazio libero: circa 350 MB per il pacchetto estratto, circa 1 GB per gli strumenti di compilazione (si preparano da soli al primo avvio) e fino a circa 3 GB per ogni versione installata.
-- **Internet non serve.** Il pacchetto completo contiene già tutto: gli strumenti di compilazione (circa 200 MB, sempre la versione 1.0.14, controllata con la sua impronta SHA-256) e la libreria che le versioni precedenti scaricavano alla prima compilazione. Internet serve solo a chi scarica il progetto con `git clone` invece del pacchetto: in quel caso gli strumenti si scaricano al primo avvio.
+- **Internet non serve.** Il pacchetto completo contiene già tutto: gli strumenti di compilazione (circa 200 MB, sempre la versione 1.0.14, controllata con la sua impronta SHA-256) e la libreria che le versioni precedenti scaricavano alla prima compilazione. Questo repository da solo (`git clone`, «Code → Download ZIP» o gli archivi «Source code») non basta: psxrecomp, recomp-ui e gli strumenti di compilazione ci sono solo nel pacchetto.
 - Il dump del tuo disco di Spider-Man 2: Enter Electro, completo (settori da 2352 byte):
   - `.bin` + `.cue`, anche con più tracce;
   - CloneCD `.img` + `.ccd` (+ `.sub`);
@@ -34,7 +36,7 @@ La versione si riconosce dall'eseguibile del disco. Il launcher dice anche se il
 
 ## Come si usa
 
-1. Estrai lo zip del pacchetto (`SM2-Recomp-<versione>.zip`, circa 270 MB) in una cartella con un percorso corto, per esempio `C:\Giochi\SM2-Recomp`: la compilazione crea file con nomi lunghi. In alternativa scarica il progetto con i sottomoduli: `git clone --recursive …` (così però al primo avvio serve internet).
+1. Scarica lo zip del pacchetto (`SM2-Recomp-<versione>.zip`, circa 270 MB) dalla pagina [Releases](https://github.com/CloudStrife29/SM2-Recomp/releases) ed estrailo in una cartella con un percorso corto, per esempio `C:\Giochi\SM2-Recomp`: la compilazione crea file con nomi lunghi.
 2. Fai doppio clic su **`SM2-Launcher.cmd`**. La prima volta prepara gli strumenti di compilazione in `tools\toolchain\cmake-clang-v1\`, estraendoli dallo zip che è già nel pacchetto: circa un minuto, senza internet. Non installa niente nel sistema e non cambia il PATH o il registro di Windows.
 3. Si apre la finestra del launcher:
    - **Aggiungi un disco...**: scegli il `.cue` (o `.ccd`, `.bin`) del tuo dump. Il launcher lo riconosce e lo sposta nella cartella `input\<versione>\`, con tutti i suoi file. Non sovrascrive mai niente.
@@ -96,6 +98,11 @@ SM2-Launcher.cmd stato
 
 Il launcher di SM2-Recomp ha la licenza MIT (`LICENSE`). Il pacchetto contiene anche psxrecomp, recomp-ui e gli strumenti di compilazione, ognuno con la sua licenza: per quella di psxrecomp il pacchetto si può usare e distribuire **solo gratis e per scopi non commerciali**; per i programmi degli strumenti con licenza GPL o LGPL i sorgenti sono in `tools\toolchain\sorgenti\`. I dettagli sono in `LICENZE.md` (in inglese: `LICENSES.md`); nel pacchetto, `PACCHETTO.txt` elenca tutti i file con le loro impronte SHA-256.
 
-Stato: prototipo. In tutte e 7 le versioni il gioco arriva a giocare dal codice ricompilato, e nei test automatici partono tutti i 44 livelli, con i moduli dei livelli compilati in anticipo. Il gioco non è ancora stato provato da un giocatore dall'inizio alla fine.
+Stato: giocabile, buon gameplay. Quello che il progetto ha documentato per la versione 0.11 (nelle [note della release 0.11](https://github.com/CloudStrife29/SM2-Recomp/releases/tag/v0.11)):
+
+- **Versioni del disco riconosciute:** le 7 della tabella qui sopra.
+- **Prove automatiche:** in tutte e 7 le versioni il gioco arriva a giocare dal codice ricompilato e partono tutti i 44 livelli, con i moduli dei livelli compilati in anticipo.
+- **Prova manuale:** una partita completa dall'inizio alla fine con la versione USA Rev 1, su un portatile di prova (Core i7-6500U, GeForce 920MX). Per le altre versioni non è documentata una partita completa.
+- **Problemi conosciuti:** sono elencati nelle note della release 0.11 e in `PROSSIMI_OBIETTIVI.md` («Difetti conosciuti da correggere»).
 
 I prossimi passi dello sviluppo sono in `PROSSIMI_OBIETTIVI.md`.
