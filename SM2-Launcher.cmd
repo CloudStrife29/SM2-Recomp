@@ -30,10 +30,10 @@ rem the system and does not change the Windows PATH or registry: the build tools
 setlocal
 cd /d "%~dp0"
 if not exist "psxrecomp\psxrecomp_cli.py" (
-  echo Manca psxrecomp: per giocare scarica il pacchetto completo di SM2-Recomp dalla pagina Releases:
-  echo https://github.com/CloudStrife29/SM2-Recomp/releases ^(il Download ZIP del pulsante Code e gli archivi Source code non bastano^).
-  echo psxrecomp is missing: to play, download the complete SM2-Recomp package from the Releases page:
-  echo https://github.com/CloudStrife29/SM2-Recomp/releases ^(Download ZIP from the Code button and the Source code archives are not enough^).
+  echo Manca psxrecomp: per giocare scarica il pacchetto completo di EnterElectro-Recomp dalla pagina Releases:
+  echo https://gitlab.com/rdecomp-labs1/EnterElectro-Recomp/-/releases ^(il download del codice dal pulsante Code e gli archivi Source code non bastano^).
+  echo psxrecomp is missing: to play, download the complete EnterElectro-Recomp package from the Releases page:
+  echo https://gitlab.com/rdecomp-labs1/EnterElectro-Recomp/-/releases ^(the source code download from the Code button and the Source code archives are not enough^).
   goto :fine
 )
 set "TC=tools\toolchain"
