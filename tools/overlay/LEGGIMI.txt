@@ -1,0 +1,55 @@
+EnterElectro-Recomp - toolchain degli overlay di psxrecomp / psxrecomp's overlay toolchain
+
+ITALIANO
+
+Questi archivi servono a psxrecomp per compilare sul tuo PC, mentre giochi, i pochi pezzi di codice del gioco che non
+sono stati compilati in anticipo (senza, quei pezzi vanno con l'interprete, piu' lento). Prima di ogni installazione il
+launcher copia i due archivi di Python e di TinyCC nella cartella dell'installazione (.cache\overlay-toolchain\), dove
+psxrecomp li cerca: cosi' psxrecomp non li scarica da internet (senza questi file li scaricherebbe da www.python.org e
+download.savannah.gnu.org). psxrecomp controlla l'impronta SHA-256 di ogni archivio a ogni uso. Sono gli archivi
+originali, non cambiati da EnterElectro-Recomp.
+
+python-3.13.1-embed-amd64.zip
+  cosa:      Python 3.13.1 incorporabile per Windows a 64 bit (Python Software Foundation)
+  SHA-256:   7b7923ff0183a8b8fca90f6047184b419b108cb437f75fc1c002f9d2f8bcec16
+  origine:   https://www.python.org/ftp/python/3.13.1/python-3.13.1-embed-amd64.zip
+  licenza:   PSF License Agreement, piu' le licenze delle librerie che include: LICENSE.txt dentro l'archivio
+
+tcc-0.9.27-win64-bin.zip
+  cosa:      TinyCC (Tiny C Compiler) 0.9.27 per Windows a 64 bit (Fabrice Bellard e gli autori di TinyCC)
+  SHA-256:   34a721949a2583fdff725312da092fa0f5f1f284b702e6f811c6954714faabb2
+  origine:   https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27-win64-bin.zip
+  licenza:   LGPL-2.1: psxrecomp\runtime\licenses\TinyCC-LICENSE.txt (l'archivio non ha un file di licenza)
+
+tcc-0.9.27.tar.bz2
+  cosa:      il sorgente di TinyCC 0.9.27, quello dell'archivio qui sopra (la LGPL-2.1 chiede di darlo insieme ai
+             programmi: va lasciato insieme a tcc-0.9.27-win64-bin.zip)
+  SHA-256:   de23af78fca90ce32dff2dd45b3432b2334740bb9bb7b05bf60fdbfc396ceb9c
+  origine:   https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27.tar.bz2
+
+ENGLISH
+
+psxrecomp uses these archives to compile on your PC, while you play, the few pieces of game code that were not
+compiled in advance (without them, those pieces run in the interpreter, which is slower). Before every installation
+the launcher copies the Python and TinyCC archives into the installation folder (.cache\overlay-toolchain\), where
+psxrecomp looks for them: so psxrecomp does not download them from the internet (without these files it would
+download them from www.python.org and download.savannah.gnu.org). psxrecomp checks the SHA-256 hash of every archive
+each time it uses it. They are the original archives, not changed by EnterElectro-Recomp.
+
+python-3.13.1-embed-amd64.zip
+  what:      Python 3.13.1 embeddable for 64-bit Windows (Python Software Foundation)
+  SHA-256:   7b7923ff0183a8b8fca90f6047184b419b108cb437f75fc1c002f9d2f8bcec16
+  source:    https://www.python.org/ftp/python/3.13.1/python-3.13.1-embed-amd64.zip
+  license:   PSF License Agreement, plus the licenses of the libraries it includes: LICENSE.txt inside the archive
+
+tcc-0.9.27-win64-bin.zip
+  what:      TinyCC (Tiny C Compiler) 0.9.27 for 64-bit Windows (Fabrice Bellard and the TinyCC authors)
+  SHA-256:   34a721949a2583fdff725312da092fa0f5f1f284b702e6f811c6954714faabb2
+  source:    https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27-win64-bin.zip
+  license:   LGPL-2.1: psxrecomp\runtime\licenses\TinyCC-LICENSE.txt (the archive has no license file)
+
+tcc-0.9.27.tar.bz2
+  what:      the source code of TinyCC 0.9.27, the one of the archive above (the LGPL-2.1 asks to provide it with the
+             programs: keep it together with tcc-0.9.27-win64-bin.zip)
+  SHA-256:   de23af78fca90ce32dff2dd45b3432b2334740bb9bb7b05bf60fdbfc396ceb9c
+  source:    https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27.tar.bz2

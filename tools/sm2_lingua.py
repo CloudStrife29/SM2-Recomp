@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""SM2-Recomp - lingua dei messaggi del launcher: italiano o inglese (4/11/2026).
-SM2-Recomp - language of the launcher messages: Italian or English (4 Nov 2026).
+"""EnterElectro-Recomp - lingua dei messaggi del launcher: italiano o inglese (4/11/2026).
+EnterElectro-Recomp - language of the launcher messages: Italian or English (4 Nov 2026).
 
 La lingua si sceglie in quest'ordine / The language is chosen in this order:
   1. imposta('it' | 'en'): opzione --lingua / --language della riga di comando, o la scelta fatta nella finestra

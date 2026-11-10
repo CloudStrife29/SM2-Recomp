@@ -1,5 +1,5 @@
 @echo off
-rem SM2-Recomp - launcher (prototipo): dal disco dell'utente al gioco per PC, tutto in locale.
+rem EnterElectro-Recomp - launcher: dal disco dell'utente al gioco per PC, tutto in locale.
 rem Doppio clic: finestra del launcher. Oppure da una finestra dei comandi, nella cartella del progetto:
 rem   SM2-Launcher.cmd riconosci                    riconosce i dischi in input\
 rem   SM2-Launcher.cmd importa "<percorso>"         riconosce un dump e lo sposta in input\<PROFILO>\
@@ -10,11 +10,12 @@ rem Messaggi in italiano o in inglese (dal 4/11/2026): li sceglie il launcher da
 rem per cambiarla. Qui sotto i messaggi di questo file sono scritti in tutte e due le lingue.
 rem La prima volta prepara il toolchain portatile (llvm-mingw, CMake, Ninja, Python) in tools\toolchain\:
 rem sempre la versione 1.0.14 (launcher 0.11), controllata con il suo SHA-256. Il pacchetto completo (dal 3/11/2026)
-rem contiene gia' lo zip (circa 200 MB) e lo estrae senza internet; se lo zip manca lo scarica.
+rem contiene gia' lo zip (circa 200 MB) e lo estrae senza internet; se lo zip manca (per esempio con git clone) lo
+rem scarica.
 rem Non installa niente nel sistema e non cambia il PATH o il registro di Windows: il toolchain vale
 rem solo per questa finestra.
 rem
-rem English: SM2-Recomp launcher (prototype): from the user's own disc to the PC game, all on this computer.
+rem English: EnterElectro-Recomp launcher: from the user's own disc to the PC game, all on this computer.
 rem Double-click: launcher window. Or from a command window, in the project folder (the Italian names work too):
 rem   SM2-Launcher.cmd identify                     recognizes the discs in input\
 rem   SM2-Launcher.cmd import "<path>"              recognizes a dump and moves it to input\<PROFILE>\
@@ -25,15 +26,19 @@ rem Messages in Italian or English: the launcher chooses from the Windows displa
 rem change it. The messages of this file are written below in both languages.
 rem The first time it prepares the portable build tools (llvm-mingw, CMake, Ninja, Python) in tools\toolchain\:
 rem always version 1.0.14 (launcher 0.11), checked with its SHA-256. The complete package already contains the zip
-rem (about 200 MB) and extracts it without internet; if the zip is missing it downloads it. It installs nothing in
-rem the system and does not change the Windows PATH or registry: the build tools are used only in this window.
+rem (about 200 MB) and extracts it without internet; if the zip is missing (for example with git clone) it downloads
+rem it. It installs nothing in the system and does not change the Windows PATH or registry: the build tools are
+rem used only in this window.
+rem Dalla 0.12 (6/11/2026) questo file restituisce il codice di uscita del launcher (0 = tutto bene), cosi' chi lo usa
+rem da uno script sa se un comando non e' riuscito; 1 se il toolchain non si prepara.
+rem From 0.12 this file returns the launcher's exit code (0 = all good), so scripts can tell when a command failed;
+rem 1 if the build tools cannot be prepared.
 setlocal
+set "CODICE=1"
 cd /d "%~dp0"
 if not exist "psxrecomp\psxrecomp_cli.py" (
-  echo Manca psxrecomp: per giocare scarica il pacchetto completo di EnterElectro-Recomp dalla pagina Releases:
-  echo https://gitlab.com/rdecomp-labs1/EnterElectro-Recomp/-/releases ^(il download del codice dal pulsante Code e gli archivi Source code non bastano^).
-  echo psxrecomp is missing: to play, download the complete EnterElectro-Recomp package from the Releases page:
-  echo https://gitlab.com/rdecomp-labs1/EnterElectro-Recomp/-/releases ^(the source code download from the Code button and the Source code archives are not enough^).
+  echo Manca psxrecomp: per giocare serve lo zip del pacchetto completo di EnterElectro-Recomp, dalla pagina Releases.
+  echo psxrecomp is missing: to play you need the complete EnterElectro-Recomp package zip, from the Releases page.
   goto :fine
 )
 set "TC=tools\toolchain"
@@ -53,9 +58,9 @@ curl.exe -fL -o "%TCZIP%" "%TCURL%"
 if errorlevel 1 (
   echo ERRORE: download del toolchain non riuscito.
   echo ERROR: the build tools download failed.
-  echo Senza internet serve il pacchetto completo di SM2-Recomp, che contiene gia' %TCZIP%:
+  echo Senza internet serve il pacchetto completo di EnterElectro-Recomp, che contiene gia' %TCZIP%:
   echo in alternativa copia quel file in %TC%\ e rilancia.
-  echo Without internet you need the complete SM2-Recomp package, which already contains %TCZIP%:
+  echo Without internet you need the complete EnterElectro-Recomp package, which already contains %TCZIP%:
   echo otherwise copy that file into %TC%\ and start again.
   if exist "%TCZIP%" del "%TCZIP%"
   goto :fine
@@ -88,5 +93,7 @@ if errorlevel 1 (
 :pronto
 call "%TCDIR%\env.bat"
 python tools\sm2_launcher.py %*
+set "CODICE=%ERRORLEVEL%"
 :fine
 if "%~1"=="" pause
+exit /b %CODICE%

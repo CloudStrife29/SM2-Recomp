@@ -2010,3 +2010,2042 @@ index 8ac180b7..f8ee2921 100644
  
  if __name__ == '__main__':
      unittest.main()
+
+# ---- SM2-Recomp 0.12 (5/11/2026): modifiche in piu' rispetto alla 0.11 / changes on top of 0.11 ----
+
+--- a/runtime/src/gpu_fmv_hd.c
++++ b/runtime/src/gpu_fmv_hd.c
+@@ -27,7 +27,8 @@
+ #define realloc fmv_hd_test_realloc
+ #endif
+ 
+-#define FMV_MAX_MOVIES   16
++#define FMV_MAX_MOVIES   64     /* SM2-Recomp: 26-27 filmati e 12-13 titoli di giornale per disco */
++#define FMV_LBA_SLACK    3      /* SM2-Recomp: margine dei settori di ogni fotogramma (vedi sotto) */
+ #define FMV_RING         32
+ #define FMV_WORKERS      6
+ #define FMV_FILE_MAX     (64u * 1024u * 1024u)
+@@ -421,8 +422,11 @@
+                 if (y0 + fh > src_h || y0 < 0) continue;
+                 signature(bgra, src_w, x0, y0, fw, fh, (int)mv->h.sig_w, (int)mv->h.sig_h, sig);
+                 for (int f = lo; f <= hi; ++f) {
+-                    if (mv->bound_stream && (timeline.delivered_lba < mv->frame_lbas[f] ||
+-                        (f + 1 < (int)mv->h.frames && timeline.delivered_lba >= mv->frame_lbas[f + 1])))
++                    /* SM2-Recomp: margine di FMV_LBA_SLACK settori, perche' mentre un fotogramma resta a schermo
++                     * il CD consegna 11 settori, uno piu' della distanza tra due fotogrammi (misurato su SM2). */
++                    if (mv->bound_stream && (timeline.delivered_lba < mv->frame_lbas[f] - FMV_LBA_SLACK ||
++                        (f + 1 < (int)mv->h.frames &&
++                         timeline.delivered_lba >= mv->frame_lbas[f + 1] + FMV_LBA_SLACK)))
+                         continue;
+                     const unsigned d = distance(sig, mv->sigs + (size_t)f * n, n);
+                     if (d < m_d) { m_d = d; m_f = f; m_dy = dy; }
+--- a/runtime/src/host_osd.c
++++ b/runtime/src/host_osd.c
+@@ -11,6 +11,7 @@
+ 
+ #include <stdio.h>
+ #include <string.h>
++#include <stdlib.h>   /* SM2-Recomp: getenv, strtol (volume all'avvio) */
+ 
+ #if defined(RECOMP_LAUNCHER)
+ #define HOST_OSD_VISUAL 1
+@@ -404,15 +405,38 @@
+ #endif
+ }
+ 
++/* SM2-Recomp: volume all'avvio scelto nel launcher di SM2-Recomp (variabile PSX_VOLUME, da 0 a 100), letto una
++ * volta sola prima della prima lettura o modifica del volume; senza la variabile il volume parte da 100. */
++static void sm2_volume_iniziale(void) {
++    static int letto = 0;
++    const char *e;
++    char *fine = NULL;
++    long v;
++    if (letto) return;
++    letto = 1;
++    e = getenv("PSX_VOLUME");
++    if (!e || !*e) return;
++    v = strtol(e, &fine, 10);
++    if (fine == e) return;
++    if (v < 0) v = 0;
++    if (v > 100) v = 100;
++    s_volume = clamp_pct((int)v);
++    printf("[SM2-Recomp] volume all'avvio %d%% (PSX_VOLUME)\n", s_volume);
++    fflush(stdout);
++}
++
+ int host_volume_get(void) {
++    sm2_volume_iniziale();
+     return s_volume;
+ }
+ 
+ void host_volume_set(int percent) {
++    sm2_volume_iniziale();
+     s_volume = clamp_pct(percent);
+ }
+ 
+ int host_volume_adjust(int delta) {
++    sm2_volume_iniziale();
+     s_volume = clamp_pct(s_volume + delta);
+ #if HOST_OSD_VISUAL
+     host_osd_show_volume(s_volume, OSD_DEFAULT_MS);
+--- a/runtime/runtime.cmake
++++ b/runtime/runtime.cmake
+@@ -1737,7 +1737,14 @@
+                 target_compile_options(${target} PRIVATE -fprofile-instr-generate)
+                 target_link_options(${target} PRIVATE -fprofile-instr-generate)
+             else()
+-                set(_psx_pgo_profile "${_psx_pgo_dir}/default.profdata")
++                # SM2-Recomp: con Ninja il compilatore lavora nella cartella di compilazione, quindi basta il
++                # percorso relativo, uguale in ogni installazione: la cache del compilatore riusa gli oggetti tra
++                # cartelle diverse (nella chiave di ccache c'e' comunque il contenuto del profilo).
++                if(CMAKE_GENERATOR MATCHES "Ninja")
++                    set(_psx_pgo_profile "pgo/default.profdata")
++                else()
++                    set(_psx_pgo_profile "${_psx_pgo_dir}/default.profdata")
++                endif()
+                 target_compile_options(${target} PRIVATE
+                     "-fprofile-instr-use=${_psx_pgo_profile}"
+                     -Wno-profile-instr-out-of-date
+--- a/psxrecomp_cli.py
++++ b/psxrecomp_cli.py
+@@ -637,6 +637,13 @@
+             )
+ 
+     src = recompiler_source_dir(project_root)
++    # SM2-Recomp: percorso vero, senza la giunzione psxrecomp della cartella di installazione: cartella di
++    # compilazione e comandi degli emettitori sono gli stessi per ogni installazione, quindi ninja non li
++    # ricompila tutti ogni volta (prima cambiava il percorso nei comandi).
++    try:
++        src = src.resolve()
++    except OSError:
++        pass
+     # Prefer recompiler/build (packaging / Retro harvest layout); also keep
+     # project-root build-recompiler if that is where prior binaries lived.
+     build_dir = src / "build"
+--- a/runtime/src/main.cpp
++++ b/runtime/src/main.cpp
+@@ -3756,6 +3756,373 @@
+     return std::fabs(g_host_refresh_hz - guest_hz) <= guest_hz * 0.02;
+ }
+ 
++/* SM2-Recomp 0.12 finale (7/11/2026, "Meno scatti", task 80): ritmo agganciato ai refresh dello schermo.
++ * Su uno schermo che e' un multiplo intero k >= 2 del ritmo del gioco (120 o 240 Hz con la USA a 59,94, 100 o 200 Hz
++ * con l'Europa a 50) il pacer andava al ritmo del gioco e la sua fase rispetto ai refresh scivolava: a 240 Hz circa ogni
++ * 4 secondi un fotogramma restava a schermo 5 refresh invece di 4, uno scatto con gli fps "stabili". Come psxrecomp fa
++ * gia' sugli schermi a 60 Hz (sync-to-host-refresh), il pacer va a host/k (60,000 Hz su 120 e 240 Hz: il gioco va lo 0,1%
++ * piu' veloce, come su uno schermo a 60 Hz) con la sincronia normale. In piu', su Windows, la fase dello swap resta a
++ * meta' del refresh: prima di ogni swap si legge la riga dello schermo (D3DKMTGetScanLine, lo stesso dato dei limitatori
++ * di fotogrammi con la sincronia sulla riga) e le scadenze del pacer si correggono di poco (al massimo il 3% di un
++ * refresh a fotogramma), cosi' ogni fotogramma resta k refresh anche se l'orologio del PC e quello dello schermo non sono
++ * identici. Quando invece lo swap aspetta lui il refresh (schermo intero con il flip, misurato il 7/11 sull'i9: la fase
++ * resta vicino al vblank qualunque sia la scadenza, e correggere rallentava il gioco) la correzione si spegne da sola e
++ * resta il ritmo host/k, che li' basta; si spegne anche se in 10 s la correzione media supera lo 0,1% del fotogramma
++ * (aggancio che non converge). Solo con la sincronia accesa o adattiva (non con VRR, interpolazione dei fotogrammi, netplay o un ritmo
++ * scelto da una mod). PSX_SM2_RITMO: 0 = come psxrecomp; misura = ritmo di prima, solo le misure; multiplo = host/k
++ * senza aggancio; altrimenti host/k con l'aggancio. Ogni 10 s una riga "SM2 ritmo" con la fase dello swap e gli
++ * attraversamenti del vblank (un attraversamento = un fotogramma tenuto un refresh in piu' o in meno). */
++static std::atomic<int> s_sm2_k{0};   /* k del multiplo in uso (0 = niente) */
++static int s_sm2_modo = -1;           /* 0 spento, 1 misura, 2 multiplo, 3 aggancio */
++static double s_sm2_hz = 0.0;         /* refresh dello schermo per cui vale s_sm2_k */
++
++static int sm2_ritmo_modo(void) {
++    if (s_sm2_modo >= 0)
++        return s_sm2_modo;
++    const char *e = std::getenv("PSX_SM2_RITMO");
++    if (e && (std::strcmp(e, "0") == 0 || std::strcmp(e, "spento") == 0))
++        s_sm2_modo = 0;
++    else if (e && std::strcmp(e, "misura") == 0)
++        s_sm2_modo = 1;
++    else if (e && std::strcmp(e, "multiplo") == 0)
++        s_sm2_modo = 2;
++    else
++        s_sm2_modo = 3;
++    return s_sm2_modo;
++}
++
++static int sm2_ritmo_multiplo(double host_hz) {
++    if (!(host_hz > 0.0) || !(g_guest_frame_period_ms > 0.0))
++        return 0;
++    if (g_video_vsync != 1 && g_video_vsync != -1)
++        return 0;
++    if (g_frame_interpolation || psx_netplay_active() || g_mod_native_vblank_rate)
++        return 0;
++    const double guest_hz = 1000.0 / g_guest_frame_period_ms;
++    const double k = std::floor(host_hz / guest_hz + 0.5);
++    if (k < 2.0 || k > 8.0)
++        return 0;
++    return std::fabs(host_hz / k - guest_hz) <= guest_hz * 0.02 ? (int)k : 0;
++}
++
++#if defined(_WIN32) && !defined(PSX_SDL_NO_RENDER)
++struct Sm2KmtApri { HDC hDc; UINT hAdapter; LUID AdapterLuid; UINT VidPnSourceId; };
++struct Sm2KmtRiga { UINT hAdapter; UINT VidPnSourceId; BOOLEAN InVerticalBlank; UINT ScanLine; };
++struct Sm2KmtChiudi { UINT hAdapter; };
++typedef LONG (APIENTRY *Sm2KmtApriFn)(Sm2KmtApri *);
++typedef LONG (APIENTRY *Sm2KmtRigaFn)(Sm2KmtRiga *);
++typedef LONG (APIENTRY *Sm2KmtChiudiFn)(Sm2KmtChiudi *);
++static Sm2KmtApriFn s_sm2_kmt_apri = nullptr;
++static Sm2KmtRigaFn s_sm2_kmt_riga = nullptr;
++static Sm2KmtChiudiFn s_sm2_kmt_chiudi = nullptr;
++static std::atomic<unsigned> s_sm2_adattatore{0}, s_sm2_sorgente{0};
++static std::atomic<int> s_sm2_scan_ok{0};
++static int s_sm2_scan_stato = 0;      /* 0 da aprire, 1 aperto, -1 non disponibile */
++static HMONITOR s_sm2_monitor = nullptr;
++static unsigned s_sm2_righe = 0, s_sm2_attive = 0;   /* righe totali e attive del modo video (QueryDisplayConfig) */
++static std::atomic<unsigned> s_sm2_swap_seq{0}, s_sm2_swap_riga{0}, s_sm2_swap_vb{0};
++static std::atomic<uint64_t> s_sm2_swap_inizio{0}, s_sm2_swap_durata{0}, s_sm2_swap_quanti{0};
++static int s_sm2_aggancio = 1;        /* 0: correzione spenta (swap che aspetta il refresh, o aggancio che non converge) */
++
++struct Sm2RitmoStat {
++    uint64_t frame, ultimo_swap, n, attraversamenti, salti, n_tot, attraversamenti_tot;
++    uint64_t durata0, quanti0;        /* durata degli swap e quanti, all'inizio della finestra */
++    double somma, somma2, corr;
++    unsigned righe_viste, vb_da;
++    double fase_prec;
++    uint32_t seq_visto;
++    int fonte_log;
++};
++static Sm2RitmoStat s_sm2_st;
++
++static void sm2_ritmo_azzera(void) {
++    s_sm2_st = Sm2RitmoStat{};
++    s_sm2_st.vb_da = 0xFFFFFFFFu;
++    s_sm2_st.fase_prec = -1.0;
++    s_sm2_st.seq_visto = s_sm2_swap_seq.load(std::memory_order_acquire);
++    s_sm2_st.durata0 = s_sm2_swap_durata.load();
++    s_sm2_st.quanti0 = s_sm2_swap_quanti.load();
++    s_sm2_aggancio = 1;
++}
++
++static int sm2_leggi_riga(unsigned *riga, unsigned *vb) {
++    if (!s_sm2_scan_ok.load(std::memory_order_acquire) || !s_sm2_kmt_riga)
++        return 0;
++    Sm2KmtRiga r{};
++    r.hAdapter = s_sm2_adattatore.load(std::memory_order_relaxed);
++    r.VidPnSourceId = s_sm2_sorgente.load(std::memory_order_relaxed);
++    if (s_sm2_kmt_riga(&r) != 0)
++        return 0;
++    *riga = r.ScanLine;
++    *vb = r.InVerticalBlank ? 1u : 0u;
++    return 1;
++}
++
++/* Chiamata dal disegno OpenGL subito prima (dopo = 0) e subito dopo (dopo = 1) ogni swap, dal thread che fa lo swap
++ * (principale, di disegno o di presentazione): la riga dello schermo prima e quanto e' durato lo swap. */
++extern "C" void sm2_ritmo_swap(int dopo) {
++    if (!s_sm2_k.load(std::memory_order_relaxed))
++        return;
++    const uint64_t ora = SDL_GetPerformanceCounter();
++    if (dopo) {
++        const uint64_t inizio = s_sm2_swap_inizio.exchange(0);
++        if (inizio && ora > inizio) {
++            s_sm2_swap_durata.fetch_add(ora - inizio, std::memory_order_relaxed);
++            s_sm2_swap_quanti.fetch_add(1, std::memory_order_relaxed);
++        }
++        return;
++    }
++    unsigned riga = 0, vb = 0;
++    if (!sm2_leggi_riga(&riga, &vb))
++        return;
++    s_sm2_swap_riga.store(riga, std::memory_order_relaxed);
++    s_sm2_swap_vb.store(vb, std::memory_order_relaxed);
++    s_sm2_swap_seq.fetch_add(1, std::memory_order_release);
++    s_sm2_swap_inizio.store(SDL_GetPerformanceCounter(), std::memory_order_relaxed);
++}
++
++static void sm2_scan_chiudi(void) {
++    if (s_sm2_scan_ok.exchange(0) && s_sm2_kmt_chiudi) {
++        Sm2KmtChiudi c{};
++        c.hAdapter = s_sm2_adattatore.load();
++        s_sm2_kmt_chiudi(&c);
++    }
++}
++
++/* Righe totali e attive del modo video del monitor (le stesse di QueryDisplayConfig: per esempio 1765 e 1600). */
++static void sm2_righe_del_modo(const wchar_t *dispositivo) {
++    s_sm2_righe = s_sm2_attive = 0;
++    UINT32 np = 0, nm = 0;
++    if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &np, &nm) != ERROR_SUCCESS || !np || !nm)
++        return;
++    std::vector<DISPLAYCONFIG_PATH_INFO> percorsi(np);
++    std::vector<DISPLAYCONFIG_MODE_INFO> modi(nm);
++    if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &np, percorsi.data(), &nm, modi.data(), nullptr) != ERROR_SUCCESS)
++        return;
++    for (UINT32 i = 0; i < np; i++) {
++        DISPLAYCONFIG_SOURCE_DEVICE_NAME sn{};
++        sn.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
++        sn.header.size = sizeof(sn);
++        sn.header.adapterId = percorsi[i].sourceInfo.adapterId;
++        sn.header.id = percorsi[i].sourceInfo.id;
++        if (DisplayConfigGetDeviceInfo(&sn.header) != ERROR_SUCCESS || lstrcmpW(sn.viewGdiDeviceName, dispositivo) != 0)
++            continue;
++        const UINT32 m = percorsi[i].targetInfo.modeInfoIdx;
++        if (m == DISPLAYCONFIG_PATH_MODE_IDX_INVALID || m >= nm ||
++            modi[m].infoType != DISPLAYCONFIG_MODE_INFO_TYPE_TARGET)
++            continue;
++        const DISPLAYCONFIG_VIDEO_SIGNAL_INFO &v = modi[m].targetMode.targetVideoSignalInfo;
++        if (v.totalSize.cy > v.activeSize.cy && v.activeSize.cy > 0) {
++            s_sm2_righe = v.totalSize.cy;
++            s_sm2_attive = v.activeSize.cy;
++        }
++        return;
++    }
++}
++
++static void sm2_scan_apri(void) {
++    if (!s_sm2_kmt_apri) {
++        HMODULE g = GetModuleHandleW(L"gdi32.dll");
++        if (!g)
++            g = LoadLibraryW(L"gdi32.dll");
++        if (g) {
++            s_sm2_kmt_apri = (Sm2KmtApriFn)(void *)GetProcAddress(g, "D3DKMTOpenAdapterFromHdc");
++            s_sm2_kmt_riga = (Sm2KmtRigaFn)(void *)GetProcAddress(g, "D3DKMTGetScanLine");
++            s_sm2_kmt_chiudi = (Sm2KmtChiudiFn)(void *)GetProcAddress(g, "D3DKMTCloseAdapter");
++        }
++        if (!s_sm2_kmt_apri || !s_sm2_kmt_riga || !s_sm2_kmt_chiudi) {
++            s_sm2_scan_stato = -1;
++            std::printf("psxrecomp: SM2 ritmo: D3DKMT non disponibile, ritmo multiplo senza aggancio\n");
++            return;
++        }
++    }
++    HWND hwnd = sdl_window ? (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_window),
++                                                         SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr) : nullptr;
++    if (!hwnd)
++        return;                       /* finestra non ancora pronta: si riprova al prossimo fotogramma */
++    HMONITOR mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
++    MONITORINFOEXW mi{};
++    mi.cbSize = sizeof(mi);
++    if (!mon || !GetMonitorInfoW(mon, (MONITORINFO *)&mi)) {
++        s_sm2_scan_stato = -1;
++        return;
++    }
++    HDC dc = CreateDCW(nullptr, mi.szDevice, nullptr, nullptr);
++    if (!dc) {
++        s_sm2_scan_stato = -1;
++        return;
++    }
++    Sm2KmtApri a{};
++    a.hDc = dc;
++    const LONG st = s_sm2_kmt_apri(&a);
++    DeleteDC(dc);
++    sm2_scan_chiudi();
++    if (st != 0) {
++        s_sm2_scan_stato = -1;
++        std::printf("psxrecomp: SM2 ritmo: riga dello schermo non disponibile (0x%lx), ritmo multiplo senza aggancio\n",
++                    (unsigned long)st);
++        return;
++    }
++    sm2_righe_del_modo(mi.szDevice);
++    s_sm2_adattatore.store(a.hAdapter);
++    s_sm2_sorgente.store(a.VidPnSourceId);
++    s_sm2_scan_ok.store(1, std::memory_order_release);
++    s_sm2_monitor = mon;
++    s_sm2_scan_stato = 1;
++    sm2_ritmo_azzera();
++    char nome[64] = "";
++    WideCharToMultiByte(CP_UTF8, 0, mi.szDevice, -1, nome, (int)sizeof(nome), nullptr, nullptr);
++    std::printf("psxrecomp: SM2 ritmo: riga dello schermo da %s (righe %u, attive %u%s)\n", nome,
++                s_sm2_righe, s_sm2_attive, s_sm2_righe ? "" : ": dalle letture");
++}
++
++/* Dopo l'attesa del pacer (thread principale): campione, statistiche e, con l'aggancio, correzione della prossima
++ * scadenza. atteso: tick passati ad aspettare (0 = fotogramma in ritardo, niente correzione). */
++static void sm2_ritmo_dopo_attesa(FramePacer *p, uint64_t atteso) {
++    const int k = s_sm2_k.load(std::memory_order_relaxed);
++    if (!k || s_sm2_scan_stato < 0)
++        return;
++    if (s_sm2_scan_stato == 0) {
++        sm2_scan_apri();
++        if (s_sm2_scan_stato != 1)
++            return;
++    }
++    Sm2RitmoStat &st = s_sm2_st;
++    st.frame++;
++    if ((st.frame & 255u) == 0 && sdl_window) {      /* la finestra e' passata su un altro schermo? */
++        HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(sdl_window),
++                                                 SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
++        if (hwnd && MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) != s_sm2_monitor) {
++            s_sm2_scan_stato = 0;
++            return;
++        }
++    }
++    unsigned riga = 0, vb = 0;
++    int fonte;
++    const uint32_t seq = s_sm2_swap_seq.load(std::memory_order_acquire);
++    if (seq != st.seq_visto) {
++        st.seq_visto = seq;
++        riga = s_sm2_swap_riga.load(std::memory_order_relaxed);
++        vb = s_sm2_swap_vb.load(std::memory_order_relaxed);
++        st.ultimo_swap = st.frame;
++        fonte = 1;
++    } else if (st.frame - st.ultimo_swap > 30) {    /* nessuno swap OpenGL (Vulkan): fase all'uscita dal pacer */
++        if (!sm2_leggi_riga(&riga, &vb))
++            return;
++        fonte = 2;
++    } else {
++        return;
++    }
++    if (riga + 1 > st.righe_viste)
++        st.righe_viste = riga + 1;
++    if (vb && riga < st.vb_da)
++        st.vb_da = riga;
++    unsigned righe = s_sm2_righe, inizio_vb = s_sm2_attive;
++    if (!righe) {                     /* senza QueryDisplayConfig: dalle letture */
++        righe = st.righe_viste;
++        inizio_vb = st.vb_da;
++        if (st.frame < 240 || inizio_vb == 0xFFFFFFFFu || inizio_vb >= righe || righe < 100)
++            return;
++    }
++    if (riga >= righe)
++        riga = righe - 1;
++    const double fase = (double)((riga + righe - inizio_vb) % righe) / (double)righe;  /* 0 = inizio del vblank */
++    double err = fase - 0.5;
++    if (st.fase_prec >= 0.0) {
++        if ((st.fase_prec > 0.75 && fase < 0.25) || (st.fase_prec < 0.25 && fase > 0.75))
++            st.attraversamenti++;
++        double d = fase - st.fase_prec;
++        d -= std::floor(d + 0.5);
++        if (std::fabs(d) > 0.25)
++            st.salti++;
++    }
++    st.fase_prec = fase;
++    st.n++;
++    st.somma += fase;
++    st.somma2 += fase * fase;
++    const double freq_swap = (double)SDL_GetPerformanceFrequency();
++    const uint64_t q_swap = s_sm2_swap_quanti.load(std::memory_order_relaxed) - st.quanti0;
++    const double durata_swap_ms = q_swap ? 1000.0 * (double)(s_sm2_swap_durata.load(std::memory_order_relaxed) -
++                                                             st.durata0) / (double)q_swap / freq_swap : 0.0;
++    if (s_sm2_modo == 3 && s_sm2_aggancio && q_swap >= 60 && s_sm2_hz > 0.0 &&
++        durata_swap_ms > 0.25 * 1000.0 / s_sm2_hz) {
++        s_sm2_aggancio = 0;
++        std::printf("psxrecomp: SM2 ritmo: lo swap aspetta il refresh (%.2f ms in media): niente correzione, resta il "
++                    "ritmo 1/%d del refresh\n", durata_swap_ms, k);
++        std::fflush(stdout);
++    }
++    if (s_sm2_modo == 3 && s_sm2_aggancio && atteso > 0 && s_sm2_hz > 0.0) {
++        const double tr_ms = 1000.0 / s_sm2_hz;
++        double corr_ms = -0.08 * err * tr_ms;
++        const double lim = 0.03 * tr_ms;
++        if (corr_ms > lim) corr_ms = lim;
++        if (corr_ms < -lim) corr_ms = -lim;
++        const double freq = (double)SDL_GetPerformanceFrequency();
++        const int64_t delta = (int64_t)(corr_ms * freq / 1000.0);
++        p->next_deadline = (uint64_t)((int64_t)p->next_deadline + delta);
++        st.corr += corr_ms;
++    }
++    st.fonte_log = fonte;
++    if (st.n >= 600) {
++        const double media = st.somma / (double)st.n;
++        double var = st.somma2 / (double)st.n - media * media;
++        if (var < 0.0) var = 0.0;
++        st.n_tot += st.n;
++        st.attraversamenti_tot += st.attraversamenti;
++        const double corr_media_us = st.n ? 1000.0 * st.corr / (double)st.n : 0.0;
++        std::printf("psxrecomp: SM2 ritmo k=%d %s: swap a %.3f del refresh dal vblank (dev %.3f), attraversamenti %llu "
++                    "(%llu in tutto), salti %llu, correzione media %+.2f us, %llu campioni (%s), righe %u/%u, swap "
++                    "%.2f ms\n",
++                    k, s_sm2_modo == 3 ? (s_sm2_aggancio ? "agganciato" : "multiplo (aggancio spento)") :
++                    (s_sm2_modo == 2 ? "multiplo senza aggancio" : "misura"),
++                    media, std::sqrt(var), (unsigned long long)st.attraversamenti,
++                    (unsigned long long)st.attraversamenti_tot, (unsigned long long)st.salti, corr_media_us,
++                    (unsigned long long)st.n, fonte == 1 ? "swap" : "pacer", inizio_vb, righe, durata_swap_ms);
++        if (s_sm2_modo == 3 && s_sm2_aggancio && s_sm2_hz > 0.0 &&
++            std::fabs(corr_media_us) > 0.001 * k * 1e6 / s_sm2_hz) {
++            s_sm2_aggancio = 0;
++            std::printf("psxrecomp: SM2 ritmo: l'aggancio non converge (correzione media %+.2f us): niente correzione, "
++                        "resta il ritmo 1/%d del refresh\n", corr_media_us, k);
++        }
++        std::fflush(stdout);
++        st.n = 0;
++        st.attraversamenti = st.salti = 0;
++        st.somma = st.somma2 = st.corr = 0.0;
++        st.durata0 = s_sm2_swap_durata.load();
++        st.quanti0 = s_sm2_swap_quanti.load();
++    }
++}
++#else
++static void sm2_ritmo_dopo_attesa(FramePacer *p, uint64_t atteso) {
++    (void)p;
++    (void)atteso;
++}
++#endif
++
++#ifndef PSX_SDL_NO_RENDER
++extern "C" void (*gl_renderer_sm2_swap)(int dopo);
++#endif
++
++/* Chiamata da refresh_host_display_cadence a ogni cambio di schermo o di refresh. */
++static void sm2_ritmo_aggiorna(double host_hz) {
++    const int modo = sm2_ritmo_modo();
++    const int k = modo >= 1 ? sm2_ritmo_multiplo(host_hz) : 0;
++    const int prima = s_sm2_k.load();
++    s_sm2_hz = host_hz;
++    s_sm2_k.store(k);
++#if defined(_WIN32) && !defined(PSX_SDL_NO_RENDER)
++    if (k && !gl_renderer_sm2_swap)
++        gl_renderer_sm2_swap = sm2_ritmo_swap;
++    if (k != prima || s_sm2_scan_stato > 0) {
++        if (s_sm2_scan_stato > 0)
++            s_sm2_scan_stato = 0;     /* schermo o refresh cambiati: si riapre */
++        sm2_ritmo_azzera();
++    }
++#else
++    (void)prima;
++#endif
++}
++
+ static void refresh_host_display_cadence(int force_log, int force_probe) {
+ #ifndef PSX_SDL_NO_RENDER
+     if (!sdl_window)
+@@ -3804,10 +4171,16 @@
+     g_host_refresh_display_idx = disp_idx;
+     g_host_refresh_hz = host_hz;
+     g_frame_period_ms = g_guest_frame_period_ms;
++    sm2_ritmo_aggiorna(host_hz);     /* SM2-Recomp: "Meno scatti" (ritmo agganciato ai refresh) */
+     if (host_refresh_matches_guest_cadence()) {
+         g_frame_period_ms = 1000.0 / host_hz;
+         std::printf("psxrecomp: sync-to-host-refresh: pacing to %.1f Hz panel "
+                     "(%.4f ms/frame)\n", host_hz, g_frame_period_ms);
++    } else if (s_sm2_k.load() >= 2 && sm2_ritmo_modo() >= 2) {
++        g_frame_period_ms = 1000.0 * (double)s_sm2_k.load() / host_hz;
++        std::printf("psxrecomp: sync-to-host-refresh: pacing to 1/%d of the %.1f Hz panel "
++                    "(%.4f ms/frame; SM2-Recomp, %s)\n", s_sm2_k.load(), host_hz, g_frame_period_ms,
++                    sm2_ritmo_modo() == 3 ? "phase-locked to the scanline" : "free-running");
+     } else if (host_hz > 0.0) {
+         std::printf("psxrecomp: host panel %.1f Hz does not match guest "
+                     "cadence; keeping %.2f Hz pacing\n",
+@@ -3938,13 +4311,25 @@
+     return present_vsync_owns_cadence();
+ }
+ 
++/* SM2-Recomp 0.12: la sincronia adattiva (intervallo -1) su uno schermo piu' veloce del gioco che non e' 1:1 (120,
++ * 144, 240 Hz...) diventa sincronia normale. Con -1 il driver mostra subito un frame "in ritardo", cioe' arrivato dopo
++ * piu' di un refresh dal precedente: con 50 o 60 frame al secondo su uno schermo piu' veloce succede a ogni frame e, a
++ * schermo intero, l'immagine strappa sempre. Le "Impostazioni per PC lenti" della 0.11 sceglievano la sincronia
++ * adattiva. Sugli schermi 1:1 (60 Hz con NTSC, 50 Hz con PAL) l'adattiva resta com'e'. */
++static int sm2_swap_interval(int interval) {
++    if (interval < 0 && g_host_refresh_hz > 0.0 && !host_refresh_matches_guest_cadence())
++        return 1;
++    return interval;
++}
++
+ static int present_effective_swap_interval(void) {
+     const int blocked = g_netplay_vsync_forced_off || psx_netplay_active() ||
+         g_frame_interpolation || g_present_vsync_disabled ||
+         host_driver_vsync_unreliable();
+-    return psx_present_sync_interval(g_video_vsync, blocked,
++    /* SM2-Recomp: sincronia normale (non adattiva) sugli schermi piu' veloci del gioco. */
++    return sm2_swap_interval(psx_present_sync_interval(g_video_vsync, blocked,
+         g_frame_period_ms > 0.0 ? 1000.0 / g_frame_period_ms : 0.0,
+-        g_host_refresh_hz);
++        g_host_refresh_hz));
+ }
+ 
+ extern "C" void psx_display_timing_json(char *out, int cap) {
+@@ -9750,6 +10135,10 @@
+             const uint64_t dyn_t0 = SDL_GetPerformanceCounter();
+             frame_pacer_wait(&s_frame_pacer, g_frame_period_ms);
+             const uint64_t waited = SDL_GetPerformanceCounter() - dyn_t0;
++            /* SM2-Recomp: "Meno scatti" (fase dello swap; solo dopo un'attesa vera, non con un fotogramma in
++             * ritardo) */
++            sm2_ritmo_dopo_attesa(&s_frame_pacer,
++                waited > SDL_GetPerformanceFrequency() / 10000 ? waited : 0);
+             if (g_dynres.active) g_dynres.pacer_ticks += waited;
+             g_frame_report_wait_ticks += waited;
+         }
+--- a/runtime/src/gpu_gl_renderer.c
++++ b/runtime/src/gpu_gl_renderer.c
+@@ -474,7 +474,9 @@
+     RTH_WIDE_DISABLE, RTH_WIDE_CLEAR, RTH_WIDE_CLEAR_MARGINS, RTH_PROJ_TRI,
+     RTH_WIDE_RECOVERY, RTH_INTERP_SUSPENDED, RTH_PRESENT_VRAM,
+     RTH_PRESENT_WIDE, RTH_STATE, RTH_PEEK, RTH_RING_CAPTURE, RTH_DYN_STEP,
+-    RTH_FRAME, RTH_FG_SRC, RTH_DEPTH, RTH_HD_NOTE, RTH_DITHER, RTH_WIDE_FEEDBACK
++    RTH_FRAME, RTH_FG_SRC, RTH_DEPTH, RTH_HD_NOTE, RTH_DITHER, RTH_WIDE_FEEDBACK,
++    RTH_PRECISE_LINE,   /* SM2-Recomp 0.12: PGXP sulle linee (anche nei frame generati) */
++    RTH_SM2_POLIGONO    /* SM2-Recomp 0.12: Depth Bias per poligono */
+ };
+ /* GP0(A0) whose payload gpu.c is still streaming into its array (the
+  * facade's vram_upload_open, emulation thread), tracked whatever the HD
+@@ -799,6 +801,35 @@
+  * above 1x, 2 = half a native px). */
+ static int     s_pgxp_depth = 0, s_pgxp_cpersp = 0, s_pgxp_seam = 0;
+ static float   s_pgxp_depth_threshold = 4096.0f;   /* SZ units, as DuckStation */
++/* SM2-Recomp 0.12: "Depth Bias" di DuckStation (src/core/gpu_hw.cpp, GetCurrentNormalizedVertexDepth; PGXPDepthBias,
++ * di partenza 1): con il buffer di profondita' ogni poligono controllato con la profondita' va piu' vicino alla
++ * telecamera di quelli disegnati prima, di tanti milionesimi della profondita' per poligono (fino a 2048 dopo ogni
++ * pulizia, MAX_PGXP_DEPTH_DRAW_INDEX di DuckStation), cosi' i poligoni sovrapposti restano nell'ordine di disegno; in
++ * piu' della tolleranza di psxrecomp (u_zbias). Come DuckStation (DrawPolygon) si contano i poligoni: gpu.c chiama
++ * gr_sm2_inizio_poligono prima di ogni comando di poligono e solo il primo triangolo controllato con la profondita'
++ * di quel poligono fa il passo (un quadrilatero, disegnato come due triangoli, e' un passo solo). PSX_PGXP_DEPTH_BIAS
++ * (la passa il launcher di SM2-Recomp; 0 = niente); il comando pgxp del server di debug la cambia (depth_bias). */
++static float   s_sm2_depth_bias = -1.0f;
++static int     s_sm2_depth_n = 1;
++static int     s_sm2_poligono_nuovo = 1;          /* il prossimo triangolo controllato comincia un poligono */
++static uint64_t s_sm2_poligoni_profondita = 0;    /* poligoni contati per la Depth Bias (comando pgxp) */
++static float sm2_depth_bias(void) {
++    if (s_sm2_depth_bias < 0.0f) {
++        const char *e = getenv("PSX_PGXP_DEPTH_BIAS");
++        s_sm2_depth_bias = (e && *e) ? (float)atof(e) : 1.0f;
++        if (!(s_sm2_depth_bias >= 0.0f)) s_sm2_depth_bias = 0.0f;
++    }
++    return s_sm2_depth_bias;
++}
++static void sm2_depth_bias_z(float z[3]) {
++    const float b = sm2_depth_bias();
++    if (b <= 0.0f) return;
++    const float k = 1.0f / (1.0f + (float)s_sm2_depth_n * b * 1.0e-6f);
++    for (int i = 0; i < 3; i++) z[i] *= k;
++}
++void gl_renderer_set_pgxp_depth_bias(float b) { s_sm2_depth_bias = (b >= 0.0f) ? b : 0.0f; }
++float gl_renderer_get_pgxp_depth_bias(void) { return sm2_depth_bias(); }
++uint64_t gl_renderer_sm2_depth_polygons(void) { return s_sm2_poligoni_profondita; }
+ static int     s_depth_need_clear = 1, s_depth_used = 0;
+ static float   s_depth_last_avg = 0.0f;
+ static uint64_t s_depth_clears = 0, s_depth_tris = 0, s_seam_tris = 0;
+@@ -1716,10 +1747,114 @@
+     "      acc += texture(u_tex, clamp((base + vec2(i, j) * st) / u_tex_size, lo, hi));\n"
+     "  return acc / float(n.x * n.y);\n"
+     "}\n"
++    /* SM2-Recomp 0.12 (u_sharp == 4): ingrandimento dei filmati che segue i contorni, per l'immagine gia' ripulita sul
++     * processore (sm2_filtro_cpu). Lanczos a 2 lobi sui 4x4 texel vicini; sui contorni lunghi e dritti il nucleo si
++     * allunga lungo il contorno (meno scalini) e resta stretto attraverso. Il contorno deve essere netto (tensore della
++     * struttura dei 4x4 texel), un salto e non una riga sottile, dritto anche su una zona larga il doppio e continuo lungo
++     * la sua direzione: cosi' le scritte piccole e i dettagli fini restano come sono (con un nucleo rotondo). Poi un po'
++     * di nitidezza e il risultato limitato tra il minimo e il massimo dei 4 texel centrali, cosi' non ci sono aloni. */
++    "float sm2_lanczos2(float x){\n"
++    "  if (x < 1.0e-4) return 1.0;\n"
++    "  if (x >= 2.0) return 0.0;\n"
++    "  float a = 3.14159265 * x;\n"
++    "  return 2.0 * sin(a) * sin(0.5 * a) / (a * a);\n"
++    "}\n"
++    "vec4 sm2_contorni(vec2 uv){\n"
++    "  const vec3 Y3 = vec3(0.299, 0.587, 0.114);\n"
++    "  vec2 ts = 1.0 / u_tex_size;\n"
++    "  vec2 uvlo = min(u_uv_rect.xy, u_uv_rect.zw), uvhi = max(u_uv_rect.xy, u_uv_rect.zw);\n"
++    "  ivec2 tmin = ivec2(floor(uvlo * u_tex_size)), tmax = ivec2(floor(uvhi * u_tex_size));\n"
++    "  vec2 sp = uv * u_tex_size - 0.5;\n"
++    "  vec2 fb = floor(sp);\n"
++    "  vec2 t = sp - fb;\n"
++    "  ivec2 ib = ivec2(fb);\n"
++    "  vec3 T[16];\n"
++    "  float L[16];\n"
++    "  for (int j = 0; j < 4; j++)\n"
++    "    for (int i = 0; i < 4; i++) {\n"
++    "      vec3 s = texelFetch(u_tex, clamp(ib + ivec2(i - 1, j - 1), tmin, tmax), 0).rgb;\n"
++    "      T[j * 4 + i] = s;\n"
++    "      L[j * 4 + i] = dot(s, Y3);\n"
++    "    }\n"
++    "  /* tensore della struttura sui 3x3 quadretti di 2x2 texel, pesato verso il punto */\n"
++    "  vec3 J = vec3(0.0);\n"
++    "  float wj = 0.0;\n"
++    "  for (int j = 0; j < 3; j++)\n"
++    "    for (int i = 0; i < 3; i++) {\n"
++    "      float a = L[j * 4 + i], b = L[j * 4 + i + 1], c = L[j * 4 + i + 4], d = L[j * 4 + i + 5];\n"
++    "      float gx = 0.5 * ((b + d) - (a + c));\n"
++    "      float gy = 0.5 * ((c + d) - (a + b));\n"
++    "      vec2 o = vec2(float(i) - 0.5, float(j) - 0.5) - t;\n"
++    "      float w = max(1.5 - abs(o.x), 0.0) * max(1.5 - abs(o.y), 0.0);\n"
++    "      J += w * vec3(gx * gx, gx * gy, gy * gy);\n"
++    "      wj += w;\n"
++    "    }\n"
++    "  J /= max(wj, 1.0e-6);\n"
++    "  float tr = J.x + J.z;\n"
++    "  float df = sqrt(max((J.x - J.z) * (J.x - J.z) + 4.0 * J.y * J.y, 0.0));\n"
++    "  float forza = smoothstep(0.5, 0.9, df / max(tr, 1.0e-8)) * smoothstep(0.004, 0.03, sqrt(0.5 * (tr + df)));\n"
++    "  float ang = (df > 1.0e-10) ? 0.5 * atan(2.0 * J.y, J.x - J.z) : 0.0;\n"
++    "  vec2 e1 = vec2(cos(ang), sin(ang));\n"
++    "  vec2 e2 = vec2(-e1.y, e1.x);\n"
++    "  /* un salto (la luminanza cresce da un lato all'altro), non una riga sottile */\n"
++    "  float su = 0.0, sL = 0.0, suu = 0.0, sLL = 0.0, suL = 0.0;\n"
++    "  for (int j = 0; j < 4; j++)\n"
++    "    for (int i = 0; i < 4; i++) {\n"
++    "      float u = dot(vec2(float(i - 1), float(j - 1)) - t, e1);\n"
++    "      float l = L[j * 4 + i];\n"
++    "      su += u; sL += l; suu += u * u; sLL += l * l; suL += u * l;\n"
++    "    }\n"
++    "  float corr = abs(suL - su * sL / 16.0) / sqrt(max((suu - su * su / 16.0) * (sLL - sL * sL / 16.0), 1.0e-12));\n"
++    "  forza *= smoothstep(0.5, 0.85, corr);\n"
++    "  /* dritto anche su 6x6 texel (medie di 2x2 con il filtro lineare della texture) */\n"
++    "  float G[9];\n"
++    "  for (int j = 0; j < 3; j++)\n"
++    "    for (int i = 0; i < 3; i++)\n"
++    "      G[j * 3 + i] = dot(texture(u_tex, clamp((fb + 1.0 + 2.0 * vec2(float(i - 1), float(j - 1))) * ts, uvlo, uvhi)).rgb, Y3);\n"
++    "  vec3 K = vec3(0.0);\n"
++    "  for (int j = 0; j < 2; j++)\n"
++    "    for (int i = 0; i < 2; i++) {\n"
++    "      float a = G[j * 3 + i], b = G[j * 3 + i + 1], c = G[j * 3 + i + 3], d = G[j * 3 + i + 4];\n"
++    "      float gx = (b + d) - (a + c), gy = (c + d) - (a + b);\n"
++    "      K += vec3(gx * gx, gx * gy, gy * gy);\n"
++    "    }\n"
++    "  float ktr = K.x + K.z;\n"
++    "  float kdf = sqrt(max((K.x - K.z) * (K.x - K.z) + 4.0 * K.y * K.y, 0.0));\n"
++    "  forza *= smoothstep(0.7, 0.95, kdf / max(ktr, 1.0e-8));\n"
++    "  /* continuo: lungo il contorno la luminanza cambia poco rispetto al salto attraverso */\n"
++    "  float c0 = dot(texture(u_tex, clamp(uv, uvlo, uvhi)).rgb, Y3);\n"
++    "  float pa = dot(texture(u_tex, clamp(uv + 1.5 * e2 * ts, uvlo, uvhi)).rgb, Y3);\n"
++    "  float pb = dot(texture(u_tex, clamp(uv - 1.5 * e2 * ts, uvlo, uvhi)).rgb, Y3);\n"
++    "  float qa = dot(texture(u_tex, clamp(uv + e1 * ts, uvlo, uvhi)).rgb, Y3);\n"
++    "  float qb = dot(texture(u_tex, clamp(uv - e1 * ts, uvlo, uvhi)).rgb, Y3);\n"
++    "  forza *= 1.0 - smoothstep(0.15, 0.35, max(abs(pa - c0), abs(pb - c0)) / max(abs(qa - qb), 1.0e-4));\n"
++    "  /* Lanczos con il nucleo allungato lungo il contorno */\n"
++    "  float sa = 1.0 + 0.3 * forza;\n"
++    "  float sl = 1.0 / (1.0 + 3.0 * forza);\n"
++    "  vec3 acc = vec3(0.0);\n"
++    "  float ws = 0.0;\n"
++    "  for (int j = 0; j < 4; j++)\n"
++    "    for (int i = 0; i < 4; i++) {\n"
++    "      vec2 d = vec2(float(i - 1), float(j - 1)) - t;\n"
++    "      float u = dot(d, e1) * sa, v = dot(d, e2) * sl;\n"
++    "      float w = sm2_lanczos2(sqrt(u * u + v * v));\n"
++    "      acc += w * T[j * 4 + i];\n"
++    "      ws += w;\n"
++    "    }\n"
++    "  vec3 c = acc / max(ws, 1.0e-4);\n"
++    "  /* un po' di nitidezza, senza aloni */\n"
++    "  vec3 a00 = T[5], a10 = T[6], a01 = T[9], a11 = T[10];\n"
++    "  vec3 bil = mix(mix(a00, a10, t.x), mix(a01, a11, t.x), t.y);\n"
++    "  vec3 mn = min(min(a00, a10), min(a01, a11));\n"
++    "  vec3 mx = max(max(a00, a10), max(a01, a11));\n"
++    "  c = clamp(c + 0.5 * (c - bil), mn, mx);\n"
++    "  return vec4(c, 1.0);\n"
++    "}\n"
+     "void main(){\n"
+     "  vec2 uv = v_uv;\n"
+     "  vec4 c;\n"
+-    "  if (u_sharp == 2) { c = bicubic(uv); }\n"
++    "  if (u_sharp == 4) { c = sm2_contorni(uv); }   /* SM2-Recomp: filmati */\n"
++    "  else if (u_sharp == 2) { c = bicubic(uv); }\n"
+     "  else if (u_sharp == 3) { c = area_resolve(uv); }\n"
+     "  else {\n"
+     "    if (u_sharp == 1) {\n"
+@@ -2499,6 +2634,8 @@
+         if (st) glEnable(GL_STENCIL_TEST);
+         if (bl) glEnable(GL_BLEND);
+     }
++    if (mode == 3)          /* SM2-Recomp: semitrasparenti (Depth Test Transparent Polygons): solo il test */
++        p_glUniform1f(tex ? s_tex_uZbias : s_geo_uZbias, 0.0f);
+     glDepthMask(GL_TRUE);
+     glDisable(GL_DEPTH_TEST);
+     if (mode == 2) glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+@@ -4494,14 +4631,30 @@
+  * (the lane dash cut off at the bottom of the screen), and painter order is
+  * what the game was built for. PSX_PGXP_DEPTH_NEAR tunes it (0 = off). */
+ static float s_pgxp_depth_near = -1.0f;
++/* SM2-Recomp 0.12: PGXP "Depth Test Transparent Polygons" di DuckStation (variabile PSX_PGXP_TRANSPARENT_DEPTH=1, la
++ * passa il launcher di SM2-Recomp; spento di partenza come in DuckStation): con il buffer di profondita' anche i
++ * triangoli 3D semitrasparenti (di solito ombre ed effetti) fanno il test di profondita', senza scriverla: modo 3,
++ * come il modo 1 ma senza il passaggio che scrive la profondita' e senza l'allargamento dei bordi. */
++static int sm2_pgxp_trasparenti(void) {
++    static int v = -1;
++    if (v < 0) {
++        const char *e = getenv("PSX_PGXP_TRANSPARENT_DEPTH");
++        v = (e && *e && *e != '0') ? 1 : 0;
++        if (v) {
++            printf("[SM2-Recomp] PGXP: profondita' anche per i poligoni semitrasparenti (PSX_PGXP_TRANSPARENT_DEPTH)\n");
++            fflush(stdout);
++        }
++    }
++    return v;
++}
+ static int pgxp_tri_depth_mode(int semi) {
+-    if (!(s_pgxp_depth && semi < 0 && pgxp_tri_is_3d())) return 0;
++    if (!(s_pgxp_depth && (semi < 0 || sm2_pgxp_trasparenti()) && pgxp_tri_is_3d())) return 0;
+     if (s_pgxp_depth_near < 0.0f) {
+         const char *e = getenv("PSX_PGXP_DEPTH_NEAR");
+         s_pgxp_depth_near = e && *e ? (float)atof(e) : 1024.0f;
+     }
+     const float zmin = fminf(s_pz[0], fminf(s_pz[1], s_pz[2]));
+-    return zmin >= s_pgxp_depth_near ? 1 : 0;
++    return zmin >= s_pgxp_depth_near ? (semi < 0 ? 1 : 3) : 0;   /* SM2-Recomp: 3 = semitrasparente */
+ }
+ /* Per-vertex code the shaders decode: SZ (0 = none) plus 65536 when the
+  * vertex's Gouraud colour interpolates perspective-correct. */
+@@ -4545,6 +4698,7 @@
+     flush_flat_batch();
+     s_depth_clears++;
+     s_depth_clear_reason[s_depth_need_reason]++;
++    s_sm2_depth_n = 1;   /* SM2-Recomp: Depth Bias, si riconta dopo ogni pulizia */
+     { FILE *f = pgxp_tri_log(); if (f) fprintf(f, "C\n"); }
+ }
+ /* Before a depth-tested triangle: clear when the drawing area changed since
+@@ -4563,6 +4717,11 @@
+     }
+     s_depth_used = 1;
+     s_depth_tris++;
++    if (s_sm2_poligono_nuovo) {   /* SM2-Recomp: Depth Bias, un passo per poligono come DuckStation */
++        s_sm2_poligono_nuovo = 0;
++        s_sm2_poligoni_profondita++;
++        if (s_sm2_depth_n < 2048) s_sm2_depth_n++;
++    }
+ }
+ 
+ /* Seam expansion of an opaque 3D triangle. At internal scale > 1 a vertex
+@@ -4656,6 +4815,13 @@
+     for (int k = 0; k < 3; k++) z[k] = o[k];
+ }
+ 
++/* SM2-Recomp 0.12: PGXP sulle linee come DuckStation (gr_set_precise_line): le estremita' precise della prossima
++ * linea, in pixel nativi con la frazione; le consuma la linea successiva (glb_draw_line, glb_draw_shaded_line), che
++ * le usa in tutti e tre i modi di disegno delle linee qui sotto. */
++static int   s_pl_valid = 0;
++static float s_pl_x[2], s_pl_y[2];
++static uint64_t s_sm2_fg_linee_precise = 0;   /* estremita' precise rifatte nei frame generati (comando pgxp) */
++uint64_t gl_renderer_sm2_fg_precise_lines(void) { return s_sm2_fg_linee_precise; }
+ static void gpu_geometry(GLenum mode, const int *xs, const int *ys,
+                          const uint16_t *cs, int n, int semi) {
+     flush_tex_batch();   /* flat prim: drain textured draws first (order + program) */
+@@ -4663,6 +4829,7 @@
+     mark_prim_dirty(xs, ys, n, 0 /* flat */);
+     /* Sub-pixel positions only describe a 3-vertex projected triangle. */
+     const int precise = s_pc_valid && mode == GL_TRIANGLES && n == 3;
++    const int sm2_pl = s_pl_valid && mode == GL_LINES && n == 2;   /* SM2-Recomp: PGXP sulle linee */
+ 
+     /* Native-wide: while the wide mirror is live (g_wide_cur), a line joins
+      * the flat batch as a GL_LINES batch: same vertices, program, line width
+@@ -4693,8 +4860,8 @@
+         float mask_a = (s_mask_set ? 1.0f : 0.0f) + geo_dither_code();
+         for (int i = 0; i < 2; i++) {
+             float *v = &s_fb[s_fb_n * 6];
+-            v[0] = (float)xs[i];
+-            v[1] = (float)ys[i];
++            v[0] = sm2_pl ? s_pl_x[i] : (float)xs[i];
++            v[1] = sm2_pl ? s_pl_y[i] : (float)ys[i];
+             v[2] = ((cs[i] & 0x1F) << 3) / 255.0f;
+             v[3] = (((cs[i] >> 5) & 0x1F) << 3) / 255.0f;
+             v[4] = (((cs[i] >> 10) & 0x1F) << 3) / 255.0f;
+@@ -4719,8 +4886,8 @@
+         float lv[2 * 6], quad[6 * 6];
+         float mask_a = (s_mask_set ? 1.0f : 0.0f) + geo_dither_code();
+         for (int i = 0; i < 2; i++) {
+-            lv[i*6+0] = (float)xs[i];
+-            lv[i*6+1] = (float)ys[i];
++            lv[i*6+0] = sm2_pl ? s_pl_x[i] : (float)xs[i];
++            lv[i*6+1] = sm2_pl ? s_pl_y[i] : (float)ys[i];
+             lv[i*6+2] = ((cs[i] & 0x1F) << 3) / 255.0f;
+             lv[i*6+3] = (((cs[i] >> 5) & 0x1F) << 3) / 255.0f;
+             lv[i*6+4] = (((cs[i] >> 10) & 0x1F) << 3) / 255.0f;
+@@ -4755,8 +4922,8 @@
+         float verts[3 * 6];
+         float mask_a = (s_mask_set ? 1.0f : 0.0f) + geo_dither_code();
+         for (int i = 0; i < n; i++) {
+-            verts[i*6+0] = precise ? s_pc_x[i] : (float)xs[i];
+-            verts[i*6+1] = precise ? s_pc_y[i] : (float)ys[i];
++            verts[i*6+0] = precise ? s_pc_x[i] : (sm2_pl ? s_pl_x[i] : (float)xs[i]);
++            verts[i*6+1] = precise ? s_pc_y[i] : (sm2_pl ? s_pl_y[i] : (float)ys[i]);
+             verts[i*6+2] = ((cs[i] & 0x1F) << 3) / 255.0f;
+             verts[i*6+3] = (((cs[i] >> 5) & 0x1F) << 3) / 255.0f;
+             verts[i*6+4] = (((cs[i] >> 10) & 0x1F) << 3) / 255.0f;
+@@ -4865,6 +5032,7 @@
+                 for (int i = 0; i < 3; i++) { v0[i * 6] = x[i]; v0[i * 6 + 1] = y[i]; }
+             }
+         }
++        if (dmode) sm2_depth_bias_z(z);   /* SM2-Recomp: Depth Bias di DuckStation */
+         for (int i = 0; i < 3; i++)
+             v0[i * 6 + 5] = z[i] > 65535.0f
+                 ? -pgxp_far_vertex_code(z[i], ((int)mask_a & 1), mask_a >= GPU_GEO_DITHER_CODE)
+@@ -5049,6 +5217,7 @@
+                     for (int i = 0; i < 3; i++) { t0[i * TEXV] = x[i]; t0[i * TEXV + 1] = y[i]; }
+                 }
+             }
++            if (tdmode) sm2_depth_bias_z(z);   /* SM2-Recomp: Depth Bias di DuckStation */
+             for (int i = 0; i < 3; i++) {
+                 const float code = pgxp_vertex_code(z[i]);
+                 if (z[i] > 65535.0f) t0[i * TEXV + 7] = pgxp_far_vertex_code(z[i], 0, 0);
+@@ -5620,14 +5789,25 @@
+         native_draw_end(faithful);
+     }
+ }
++/* SM2-Recomp 0.12: Depth Bias per poligono (gr_sm2_inizio_poligono, da gpu.c). */
++static void glb_sm2_inizio_poligono(void) { s_sm2_poligono_nuovo = 1; }
++/* SM2-Recomp 0.12: PGXP sulle linee (gr_set_precise_line), 16.16 come gr_set_precise_triangle. */
++static void glb_set_precise_line(int enabled, int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
++    s_pl_valid = enabled ? 1 : 0;
++    if (s_pl_valid) {
++        s_pl_x[0] = (float)x0 / 65536.0f;  s_pl_y[0] = (float)y0 / 65536.0f;
++        s_pl_x[1] = (float)x1 / 65536.0f;  s_pl_y[1] = (float)y1 / 65536.0f;
++    }
++}
+ static void glb_draw_line(int x0,int y0,int x1,int y1,uint16_t c){
+     if (cpu_raster_required()) {
+         int faithful = native_draw_begin();
+         sw_draw_line(x0,y0,x1,y1,c);
+         native_draw_end(faithful);
+     }
+-    if (!s_raster_ok) return;
++    if (!s_raster_ok) { s_pl_valid = 0; return; }   /* SM2-Recomp: le estremita' precise valgono solo per questa */
+     gpu_line(x0,y0,c, x1,y1,c, s_semi_en?s_semi_mode:-1);
++    s_pl_valid = 0;
+ }
+ static void glb_draw_shaded_line(int x0,int y0,uint16_t c0,int x1,int y1,uint16_t c1){
+     if (cpu_raster_required()) {
+@@ -5635,10 +5815,11 @@
+         sw_draw_shaded_line(x0,y0,c0,x1,y1,c1);
+         native_draw_end(faithful);
+     }
+-    if (!s_raster_ok) return;
++    if (!s_raster_ok) { s_pl_valid = 0; return; }   /* SM2-Recomp: le estremita' precise valgono solo per questa */
+     s_prim_shaded = 1;   /* shaded line: dither-eligible */
+     gpu_line(x0,y0,c0, x1,y1,c1, s_semi_en?s_semi_mode:-1);
+     s_prim_shaded = 0;
++    s_pl_valid = 0;
+ }
+ static int gl_read_display_argb(int x, int y, int w, int h, uint32_t *out,
+                                 int pitch_bytes, int cap_px, int *ow, int *oh);
+@@ -6815,6 +6996,310 @@
+     s_last_present_path = GL_PRES_CPU;
+ }
+ 
++/* ---- SM2-Recomp 0.12: filtro dei filmati in tempo reale ---------------------
++ * Acceso dal launcher di SM2-Recomp con la variabile PSX_SM2_FILTRO_FILMATI (scelte "Filtro in tempo reale" e
++ * "Migliorati", dove manca il fotogramma migliorato). Vale solo per i fotogrammi a 24 bit dei filmati (MDEC) e solo
++ * quando il filtro dei filmati e' acceso ([video] fmv_filter diverso da nearest, con l'antialiasing acceso).
++ *
++ * 1. Sul processore, prima di mandare l'immagine alla scheda video (circa 320x240 pixel; un fotogramma uguale al
++ *    precedente non si rifa'):
++ *    - quadretti della compressione: i bordi dei blocchi 8x8 della luminanza e dei blocchi del colore sono attenuati
++ *      dove l'immagine e' piatta e il salto e' piccolo, con soglie che crescono con la quantizzazione dei blocchi
++ *      decodificati dall'MDEC (come i filtri dei codec video e i filmati Migliorati di SM2-Recomp); i contorni veri,
++ *      con salti grandi o zone non piatte, restano. Senza decodifiche MDEC recenti questa parte non fa niente;
++ *    - colore: l'MDEC usa lo stesso colore per ogni quadretto di 2x2 pixel (quadretti colorati sui contorni saturi):
++ *      qui il colore di ogni pixel e' interpolato tra i centri dei quadretti vicini, senza toccare la luminanza;
++ *    la griglia dei blocchi (dove il gioco mette il filmato nell'immagine) si trova da sola.
++ * 2. Nella scheda video (u_sharp == 4 in PRESENT_FS): ingrandimento che segue i contorni con un po' di nitidezza e
++ *    senza aloni.
++ * PSX_SM2_FILTRO_FILMATI: 1 tutto, 2 solo l'ingrandimento, 3 solo la parte sul processore (per le prove). */
++#define SM2_MODO_FILTRO 4
++uint32_t mdec_sm2_qscale(void);        /* mdec.c (SM2-Recomp): quantizzazione dell'ultimo blocco decodificato */
++uint32_t mdec_get_decode_count(void);  /* mdec.c */
++
++typedef struct {
++    int letto, modo;              /* PSX_SM2_FILTRO_FILMATI: 0 spento, 1 tutto, 2 solo GPU, 3 solo processore */
++    int w, h;                     /* ultimo fotogramma */
++    size_t cap, cap_c;            /* capienza dei buffer: pixel e quadretti */
++    uint32_t *src, *out;          /* copia dell'ultimo fotogramma ricevuto e risultato */
++    int16_t *Y, *Yd;              /* luminanza 0..255 prima e dopo lo sblocco */
++    float *cb, *cr;               /* colore medio dei quadretti 2x2 (BT.601) */
++    int16_t *cbi, *cri, *cbd, *crd; /* lo stesso arrotondato, prima e dopo lo sblocco */
++    float *nb, *nr, *rb, *rr;     /* colore dei quadretti dopo lo sblocco; una riga interpolata in verticale */
++    int cw, ch;                   /* quadretti in orizzontale e in verticale */
++    double fx[8], fy[8];          /* salti medi accumulati per fase della griglia della luminanza */
++    double cx[2], cy[2];          /* salti del colore: blocchi alla fase +0 o +8 */
++    int px, py;                   /* fase della griglia 8x8 della luminanza (0..7) */
++    int pcx, pcy, pc_ok;          /* fase dei blocchi del colore (0..15) e se e' affidabile */
++    uint32_t mdec_conta;          /* contatore delle decodifiche MDEC all'ultimo fotogramma */
++    int senza_mdec;               /* presentazioni di fila senza decodifiche nuove */
++    int valido, q;                /* out corrisponde a src; quantizzazione usata */
++    int q_min, q_max;             /* quantizzazione piu' bassa e piu' alta viste (per il registro) */
++    uint64_t fotogrammi, rifatti; /* presentazioni filtrate e fotogrammi nuovi elaborati */
++    int annuncio;                 /* gia' scritto nel registro (fase e q) */
++} Sm2Filtro;
++static Sm2Filtro s_sm2;
++
++static int sm2_filtro_modo(void) {
++    if (!s_sm2.letto) {
++        const char *e = getenv("PSX_SM2_FILTRO_FILMATI");
++        s_sm2.letto = 1;
++        s_sm2.modo = (e && e[0] >= '1' && e[0] <= '3' && !e[1]) ? e[0] - '0' : 0;
++        if (s_sm2.modo) {
++            printf("[SM2-Recomp] filtro dei filmati in tempo reale acceso (modo %d)\n", s_sm2.modo);
++            fflush(stdout);
++        }
++    }
++    return s_sm2.modo;
++}
++
++static int sm2_spazio(int w, int h) {
++    const size_t n = (size_t)w * (size_t)h, nc = (size_t)(w / 2 + 2) * (size_t)(h / 2 + 2);
++    if (n <= s_sm2.cap && nc <= s_sm2.cap_c) return 1;
++    free(s_sm2.src); free(s_sm2.out); free(s_sm2.Y); free(s_sm2.Yd);
++    free(s_sm2.cb); free(s_sm2.cr); free(s_sm2.cbi); free(s_sm2.cri); free(s_sm2.cbd); free(s_sm2.crd);
++    free(s_sm2.nb); free(s_sm2.nr); free(s_sm2.rb); free(s_sm2.rr);
++    s_sm2.src = (uint32_t *)malloc(n * 4); s_sm2.out = (uint32_t *)malloc(n * 4);
++    s_sm2.Y = (int16_t *)malloc(n * 2); s_sm2.Yd = (int16_t *)malloc(n * 2);
++    s_sm2.cb = (float *)malloc(nc * sizeof(float)); s_sm2.cr = (float *)malloc(nc * sizeof(float));
++    s_sm2.cbi = (int16_t *)malloc(nc * 2); s_sm2.cri = (int16_t *)malloc(nc * 2);
++    s_sm2.cbd = (int16_t *)malloc(nc * 2); s_sm2.crd = (int16_t *)malloc(nc * 2);
++    s_sm2.nb = (float *)malloc(nc * sizeof(float)); s_sm2.nr = (float *)malloc(nc * sizeof(float));
++    s_sm2.rb = (float *)malloc((size_t)(w / 2 + 2) * sizeof(float));
++    s_sm2.rr = (float *)malloc((size_t)(w / 2 + 2) * sizeof(float));
++    s_sm2.valido = 0;
++    if (!s_sm2.src || !s_sm2.out || !s_sm2.Y || !s_sm2.Yd || !s_sm2.cb || !s_sm2.cr || !s_sm2.cbi || !s_sm2.cri ||
++        !s_sm2.cbd || !s_sm2.crd || !s_sm2.nb || !s_sm2.nr || !s_sm2.rb || !s_sm2.rr) {
++        s_sm2.cap = s_sm2.cap_c = 0;
++        return 0;
++    }
++    s_sm2.cap = n; s_sm2.cap_c = nc;
++    return 1;
++}
++
++static int sm2_lim(int v, int a, int b) { return v < a ? a : v > b ? b : v; }
++
++/* Attenua i bordi dei blocchi dove l'immagine e' piatta e il salto e' piccolo (stessa regola dei filmati Migliorati,
++ * tools/fmv/fmv_str.c): bordi alle colonne x = fx (mod passo) e alle righe y = fy (mod passo). */
++static void sm2_sblocca(int16_t *pl, int w, int h, int passo, int fx, int fy, int qscale) {
++    const int alfa = 2 + (3 * qscale) / 2, beta = 2 + qscale, tc = 1 + qscale / 2;
++    for (int pass = 0; pass < 2; ++pass) {
++        const int lim_i = pass == 0 ? w : h, lim_j = pass == 0 ? h : w, f = pass == 0 ? fx : fy;
++        for (int i = f; i < lim_i; i += passo) {
++            if (i < 3 || i > lim_i - 3) continue;
++            for (int j = 0; j < lim_j; ++j) {
++                int16_t *q = pass == 0 ? pl + (size_t)j * w + i : pl + (size_t)i * w + j;
++                const ptrdiff_t s = pass == 0 ? 1 : w;
++                const int p2 = q[-3 * s], p1 = q[-2 * s], p0 = q[-s], q0 = q[0], q1 = q[s], q2 = q[2 * s];
++                if (abs(q0 - p0) >= alfa || abs(p1 - p0) >= beta || abs(q1 - q0) >= beta) continue;
++                const int d = sm2_lim(((q0 - p0) * 4 + (p1 - q1) + 4) >> 3, -tc, tc);
++                q[-s] = (int16_t)(p0 + d);
++                q[0] = (int16_t)(q0 - d);
++                if (abs(p2 - p0) < beta)
++                    q[-2 * s] = (int16_t)(p1 + sm2_lim(((p2 + ((p0 + q0 + 1) >> 1)) >> 1) - p1, -tc / 2, tc / 2));
++                if (abs(q2 - q0) < beta)
++                    q[s] = (int16_t)(q1 + sm2_lim(((q2 + ((p0 + q0 + 1) >> 1)) >> 1) - q1, -tc / 2, tc / 2));
++            }
++        }
++    }
++}
++
++/* Fase della griglia 8x8: nelle zone piatte i salti tra pixel vicini sono piu' grandi sui bordi dei blocchi. Le medie
++ * si accumulano da un fotogramma all'altro, cosi' un fotogramma scuro o uniforme non sposta la griglia. */
++static int sm2_scegli(const double *v, int n, int attuale, double soglia) {
++    int b = 0;
++    double resto = 0;
++    for (int i = 1; i < n; ++i) if (v[i] > v[b]) b = i;
++    for (int i = 0; i < n; ++i) if (i != b) resto += v[i];
++    resto /= (double)(n - 1);
++    return (v[b] > resto * soglia && v[b] - resto > 0.05) ? b : attuale;
++}
++
++static void sm2_fasi_luma(const int16_t *Y, int w, int h) {
++    double sx[8] = { 0 }, sy[8] = { 0 };
++    long nx[8] = { 0 }, ny[8] = { 0 };
++    for (int y = 0; y < h; y += 2) {
++        const int16_t *r = Y + (size_t)y * w;
++        for (int x = 2; x + 1 < w; ++x) {
++            const int d = abs(r[x] - r[x - 1]);
++            if (d > 48 || abs(r[x - 1] - r[x - 2]) > 6 || abs(r[x + 1] - r[x]) > 6) continue;
++            sx[x & 7] += d; nx[x & 7]++;
++        }
++    }
++    for (int y = 2; y + 1 < h; ++y) {
++        const int16_t *a = Y + (size_t)(y - 2) * w, *b = a + w, *c = b + w, *e = c + w;
++        for (int x = 0; x < w; x += 2) {
++            const int d = abs(c[x] - b[x]);
++            if (d > 48 || abs(b[x] - a[x]) > 6 || abs(e[x] - c[x]) > 6) continue;
++            sy[y & 7] += d; ny[y & 7]++;
++        }
++    }
++    for (int p = 0; p < 8; ++p) {
++        s_sm2.fx[p] = 0.75 * s_sm2.fx[p] + (nx[p] ? sx[p] / (double)nx[p] : 0.0);
++        s_sm2.fy[p] = 0.75 * s_sm2.fy[p] + (ny[p] ? sy[p] / (double)ny[p] : 0.0);
++    }
++    s_sm2.px = sm2_scegli(s_sm2.fx, 8, s_sm2.px, 1.25);
++    s_sm2.py = sm2_scegli(s_sm2.fy, 8, s_sm2.py, 1.25);
++}
++
++/* Blocchi del colore (8x8 quadretti = 16x16 pixel): la griglia della luminanza dice la fase a meno di 8 pixel. */
++static void sm2_fasi_colore(void) {
++    const int cw = s_sm2.cw, ch = s_sm2.ch, ox = s_sm2.px & 1, oy = s_sm2.py & 1;
++    for (int k = 0; k < 2; ++k) {
++        const int bx = ((s_sm2.px + 8 * k + ox) >> 1) & 7, by = ((s_sm2.py + 8 * k + oy) >> 1) & 7;
++        double sx = 0, sy = 0;
++        long nx = 0, ny = 0;
++        for (int y = 0; y < ch; ++y)
++            for (int x = bx; x < cw; x += 8) {
++                if (x < 2 || x + 1 >= cw) continue;
++                const int16_t *b = s_sm2.cbi + (size_t)y * cw + x, *r = s_sm2.cri + (size_t)y * cw + x;
++                if (abs(b[-1] - b[-2]) > 4 || abs(b[1] - b[0]) > 4 || abs(r[-1] - r[-2]) > 4 || abs(r[1] - r[0]) > 4)
++                    continue;
++                sx += abs(b[0] - b[-1]) + abs(r[0] - r[-1]); nx++;
++            }
++        for (int y = by; y < ch; y += 8) {
++            if (y < 2 || y + 1 >= ch) continue;
++            for (int x = 0; x < cw; ++x) {
++                const int16_t *b = s_sm2.cbi + (size_t)y * cw + x, *r = s_sm2.cri + (size_t)y * cw + x;
++                if (abs(b[-cw] - b[-2 * cw]) > 4 || abs(b[cw] - b[0]) > 4 || abs(r[-cw] - r[-2 * cw]) > 4 ||
++                    abs(r[cw] - r[0]) > 4)
++                    continue;
++                sy += abs(b[0] - b[-cw]) + abs(r[0] - r[-cw]); ny++;
++            }
++        }
++        s_sm2.cx[k] = 0.75 * s_sm2.cx[k] + (nx ? sx / (double)nx : 0.0);
++        s_sm2.cy[k] = 0.75 * s_sm2.cy[k] + (ny ? sy / (double)ny : 0.0);
++    }
++    const int kx = s_sm2.cx[1] > s_sm2.cx[0] ? 1 : 0, ky = s_sm2.cy[1] > s_sm2.cy[0] ? 1 : 0;
++    const double rx = s_sm2.cx[kx] / (s_sm2.cx[1 - kx] + 1e-9), ry = s_sm2.cy[ky] / (s_sm2.cy[1 - ky] + 1e-9);
++    s_sm2.pcx = s_sm2.px + 8 * kx;
++    s_sm2.pcy = s_sm2.py + 8 * ky;
++    s_sm2.pc_ok = rx > 1.25 && ry > 1.25;
++}
++
++/* Parte sul processore: restituisce l'immagine da mandare alla scheda video (pixels se non c'e' niente da fare). */
++static const uint32_t *sm2_filtro_cpu(const uint32_t *pixels, int w, int h) {
++    if (w < 16 || h < 16 || !sm2_spazio(w, h)) return pixels;
++    const uint32_t conta = mdec_get_decode_count();
++    if (conta != s_sm2.mdec_conta) { s_sm2.mdec_conta = conta; s_sm2.senza_mdec = 0; }
++    else if (s_sm2.senza_mdec < 1000000) s_sm2.senza_mdec++;
++    if (s_sm2.senza_mdec > 90) return pixels;   /* niente MDEC da 1,5 s: non e' un filmato, si lascia com'e' */
++    s_sm2.fotogrammi++;
++    const size_t n = (size_t)w * (size_t)h;
++    if (s_sm2.valido && w == s_sm2.w && h == s_sm2.h && memcmp(pixels, s_sm2.src, n * 4) == 0) return s_sm2.out;
++    if (w != s_sm2.w || h != s_sm2.h) {
++        memset(s_sm2.fx, 0, sizeof s_sm2.fx); memset(s_sm2.fy, 0, sizeof s_sm2.fy);
++        memset(s_sm2.cx, 0, sizeof s_sm2.cx); memset(s_sm2.cy, 0, sizeof s_sm2.cy);
++        s_sm2.px = s_sm2.py = s_sm2.pcx = s_sm2.pcy = s_sm2.pc_ok = 0;
++    }
++    s_sm2.w = w; s_sm2.h = h;
++    memcpy(s_sm2.src, pixels, n * 4);
++    s_sm2.rifatti++;
++    /* quantizzazione dell'ultimo blocco decodificato; oltre 24 lo sblocco spianerebbe anche i dettagli veri (i filmati
++     * di Spider-Man 2 stanno molto sotto), quindi si ferma li' */
++    int q = (int)mdec_sm2_qscale();
++    if (q < 0) q = 0;
++    if (q > 24) q = 24;
++    s_sm2.q = q;
++    if (q < s_sm2.q_min || s_sm2.rifatti == 1) s_sm2.q_min = q;
++    if (q > s_sm2.q_max) s_sm2.q_max = q;
++    /* luminanza */
++    for (size_t i = 0; i < n; ++i) {
++        const uint32_t p = pixels[i];
++        const int r = (int)((p >> 16) & 0xFF), g = (int)((p >> 8) & 0xFF), b = (int)(p & 0xFF);
++        s_sm2.Y[i] = (int16_t)((19595 * r + 38470 * g + 7471 * b + 32768) >> 16);   /* BT.601 */
++    }
++    sm2_fasi_luma(s_sm2.Y, w, h);
++    /* colore medio dei quadretti 2x2 (allineati alla griglia dei blocchi) */
++    const int ox = s_sm2.px & 1, oy = s_sm2.py & 1;
++    const int cw = ((w - 1 + ox) >> 1) + 1, ch = ((h - 1 + oy) >> 1) + 1;
++    s_sm2.cw = cw; s_sm2.ch = ch;
++    for (int cy = 0; cy < ch; ++cy)
++        for (int cx = 0; cx < cw; ++cx) {
++            float sb = 0, sr = 0;
++            int k = 0;
++            for (int dy = 0; dy < 2; ++dy) {
++                const int y = 2 * cy - oy + dy;
++                if (y < 0 || y >= h) continue;
++                for (int dx = 0; dx < 2; ++dx) {
++                    const int x = 2 * cx - ox + dx;
++                    if (x < 0 || x >= w) continue;
++                    const uint32_t p = pixels[(size_t)y * w + x];
++                    const float r = (float)((p >> 16) & 0xFF), g = (float)((p >> 8) & 0xFF), b = (float)(p & 0xFF);
++                    sb += -0.168736f * r - 0.331264f * g + 0.5f * b;
++                    sr += 0.5f * r - 0.418688f * g - 0.081312f * b;
++                    k++;
++                }
++            }
++            const size_t c = (size_t)cy * cw + cx;
++            s_sm2.cb[c] = k ? sb / (float)k : 0.0f;
++            s_sm2.cr[c] = k ? sr / (float)k : 0.0f;
++            s_sm2.cbi[c] = (int16_t)lrintf(s_sm2.cb[c]);
++            s_sm2.cri[c] = (int16_t)lrintf(s_sm2.cr[c]);
++        }
++    sm2_fasi_colore();
++    /* sblocco */
++    memcpy(s_sm2.Yd, s_sm2.Y, n * 2);
++    memcpy(s_sm2.cbd, s_sm2.cbi, (size_t)cw * ch * 2);
++    memcpy(s_sm2.crd, s_sm2.cri, (size_t)cw * ch * 2);
++    if (q > 0) {
++        sm2_sblocca(s_sm2.Yd, w, h, 8, s_sm2.px, s_sm2.py, q);
++        if (s_sm2.pc_ok) {
++            const int bx = ((s_sm2.pcx + ox) >> 1) & 7, by = ((s_sm2.pcy + oy) >> 1) & 7;
++            sm2_sblocca(s_sm2.cbd, cw, ch, 8, bx, by, q);
++            sm2_sblocca(s_sm2.crd, cw, ch, 8, bx, by, q);
++        }
++    }
++    /* colore interpolato tra i centri dei quadretti e nuova immagine: si aggiungono solo le differenze, cosi' dove
++     * niente cambia il pixel resta identico. Il centro del quadretto c e' tra i pixel 2c - o e 2c - o + 1, quindi
++     * ogni pixel prende 3/4 dal suo quadretto e 1/4 dal vicino, in orizzontale e in verticale. */
++    for (size_t c = 0; c < (size_t)cw * ch; ++c) {
++        s_sm2.nb[c] = s_sm2.cb[c] + (float)(s_sm2.cbd[c] - s_sm2.cbi[c]);
++        s_sm2.nr[c] = s_sm2.cr[c] + (float)(s_sm2.crd[c] - s_sm2.cri[c]);
++    }
++    for (int y = 0; y < h; ++y) {
++        const int yc = (y + oy) >> 1, yv = sm2_lim(((y + oy) & 1) ? yc + 1 : yc - 1, 0, ch - 1);
++        const float *b0 = s_sm2.nb + (size_t)yc * cw, *b1 = s_sm2.nb + (size_t)yv * cw;
++        const float *r0 = s_sm2.nr + (size_t)yc * cw, *r1 = s_sm2.nr + (size_t)yv * cw;
++        for (int c = 0; c < cw; ++c) {
++            s_sm2.rb[c] = 0.75f * b0[c] + 0.25f * b1[c];
++            s_sm2.rr[c] = 0.75f * r0[c] + 0.25f * r1[c];
++        }
++        const float *cb0 = s_sm2.cb + (size_t)yc * cw, *cr0 = s_sm2.cr + (size_t)yc * cw;
++        const uint32_t *in = pixels + (size_t)y * w;
++        uint32_t *o = s_sm2.out + (size_t)y * w;
++        const int16_t *Y0 = s_sm2.Y + (size_t)y * w, *Y1 = s_sm2.Yd + (size_t)y * w;
++        for (int x = 0; x < w; ++x) {
++            const int xc = (x + ox) >> 1, xv = sm2_lim(((x + ox) & 1) ? xc + 1 : xc - 1, 0, cw - 1);
++            const float db = 0.75f * s_sm2.rb[xc] + 0.25f * s_sm2.rb[xv] - cb0[xc];
++            const float dr = 0.75f * s_sm2.rr[xc] + 0.25f * s_sm2.rr[xv] - cr0[xc];
++            const float dy = (float)(Y1[x] - Y0[x]) + 0.5f;     /* + 0,5: arrotondamento */
++            const uint32_t p = in[x];
++            const int r = sm2_lim((int)floorf((float)((p >> 16) & 0xFF) + dy + 1.402f * dr), 0, 255);
++            const int g = sm2_lim((int)floorf((float)((p >> 8) & 0xFF) + dy - 0.344136f * db - 0.714136f * dr), 0, 255);
++            const int b = sm2_lim((int)floorf((float)(p & 0xFF) + dy + 1.772f * db), 0, 255);
++            o[x] = (p & 0xFF000000u) | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
++        }
++    }
++    s_sm2.valido = 1;
++    if (s_sm2.annuncio < 3 && (s_sm2.rifatti == 30 || s_sm2.rifatti == 600 || s_sm2.rifatti == 6000)) {
++        s_sm2.annuncio++;
++        printf("[SM2-Recomp] filtro dei filmati: %dx%d, griglia %d,%d, colore %d,%d (%s), quantizzazione %d (da %d a %d), "
++               "fotogrammi %llu su %llu presentazioni\n", w, h, s_sm2.px, s_sm2.py, s_sm2.pcx, s_sm2.pcy,
++               s_sm2.pc_ok ? "trovata" : "incerta", q, s_sm2.q_min, s_sm2.q_max, (unsigned long long)s_sm2.rifatti,
++               (unsigned long long)s_sm2.fotogrammi);
++        fflush(stdout);
++    }
++    return s_sm2.out;
++}
++
++/* Il modo del disegno per questa presentazione: SM2_MODO_FILTRO o filt_mode com'era. */
++static int sm2_filtro_attivo(int filt_mode, int src_w, int src_h, int out_w, int out_h) {
++    if (filt_mode < 0 || !s_present_d24) return 0;
++    if (!sm2_filtro_modo()) return 0;
++    return src_w > 0 && src_h > 0 && out_w >= src_w && out_h >= src_h;
++}
++
+ void gl_renderer_present(const uint32_t *pixels, int src_w, int src_h, int linear,
+                          int force_4_3, int content_w, uint64_t guest_cycle,
+                          uint64_t guest_frame, uint64_t guest_epoch,
+@@ -6882,9 +7367,17 @@
+      * costs 10% of it, which reads as blur. Still a taste call, hence the knob. */
+     int filt_mode = linear ? fmv_filter_mode()
+                            : -1;          /* AA off: nearest, no shader work */
++    /* SM2-Recomp 0.12: filtro dei filmati in tempo reale (vedi sm2_filtro_cpu), solo se il launcher
++     * lo chiede e solo per i fotogrammi a 24 bit con un filtro dei filmati acceso. */
++    const uint32_t *sm2_pixels = pixels;
++    const int sm2 = sm2_filtro_attivo(filt_mode, src_w, src_h, lw, lh);
++    if (sm2) {
++        if (sm2_filtro_modo() != 2) sm2_pixels = sm2_filtro_cpu(pixels, src_w, src_h);
++        if (sm2_filtro_modo() != 3) filt_mode = SM2_MODO_FILTRO;
++    }
+     glViewport(lx, ly, lw, lh);
+     p_glActiveTexture(PSXGL_TEXTURE0);
+-    upload_present_tex(pixels, src_w, src_h, filt_mode >= 0 ? 1 : 0);
++    upload_present_tex(sm2_pixels, src_w, src_h, filt_mode >= 0 ? 1 : 0);
+     p_glUseProgram(s_present_prog); p_glUniform1i(s_present_uTex, 0);
+     present_set_gamma(s_present_uGamma, 1);
+     present_set_sharp(filt_mode, src_w, src_h, lw, lh);
+@@ -6907,7 +7400,8 @@
+     } else {
+         p_glUniform4f(s_present_uUvRect, 0.f, 0.f, 1.f, 1.f);
+     }
+-    const int chroma = s_fmv_chroma && s_present_d24;
++    /* SM2-Recomp: con il filtro dei filmati il colore e' gia' interpolato sul processore */
++    const int chroma = s_fmv_chroma && s_present_d24 && !(sm2 && sm2_filtro_modo() != 2);
+     if (chroma) {
+         /* present_set_sharp only sets the source size for filtered modes; the
+          * chroma tent needs it in every mode. */
+@@ -10134,13 +10628,23 @@
+                          (unsigned long long)atomic_load(&s_swap_gap_ms[i]));
+     if (used < cap) snprintf(out + used, (size_t)(cap - used), "]");
+ }
++/* SM2-Recomp 0.12 finale ("Meno scatti"): main.cpp mette qui la funzione che, subito prima (0) e subito dopo (1)
++ * ogni swap, legge la riga dello schermo e misura quanto aspetta lo swap, per agganciare il ritmo dei fotogrammi ai
++ * refresh (solo sugli schermi a 120 o 240 Hz con la USA, 100 o 200 Hz con l'Europa). NULL = niente; la funzione
++ * e' sicura da qualsiasi thread. */
++void (*gl_renderer_sm2_swap)(int dopo) = 0;
++
+ static void gl_window_swap(void) {
++    if (gl_renderer_sm2_swap)
++        gl_renderer_sm2_swap(0);
+ #if defined(PSX_SDL3)
+     psx_video_telemetry_present(SDL_GL_SwapWindow(s_win) ? 1 : 0);
+ #else
+     SDL_GL_SwapWindow(s_win);
+     psx_video_telemetry_present(-1); // SDL2 exposes no swap result.
+ #endif
++    if (gl_renderer_sm2_swap)
++        gl_renderer_sm2_swap(1);
+     if (s_swap_timing < 0) {
+         const char *env = getenv("PSX_PRESENT_TIMING");
+         s_swap_timing = env && env[0] == '1';
+@@ -11574,6 +12078,8 @@
+     .set_semi_transparency = glb_set_semi_transparency, .set_mask_bits = glb_set_mask_bits,
+     .set_texture_window = glb_set_texture_window, .set_color_modulation = glb_set_color_modulation,
+     .set_precise_triangle = glb_set_precise_triangle,
++    .set_precise_line = glb_set_precise_line,   /* SM2-Recomp */
++    .sm2_inizio_poligono = glb_sm2_inizio_poligono,   /* SM2-Recomp */
+     .set_perspective_triangle = glb_set_perspective_triangle,
+     .set_dither = glb_set_dither,
+     .fill_rect = glb_fill_rect, .copy_rect = glb_copy_rect,
+@@ -12240,6 +12746,7 @@
+     case RTH_TEX_RECT_SCALED: case RTH_LINE: case RTH_SHADED_LINE: case RTH_AREA:
+     case RTH_OFFSET: case RTH_WIDE_VIEW: case RTH_WIDE_TARGET: case RTH_WIDE_DISABLE:
+     case RTH_WIDE_CLEAR: case RTH_WIDE_CLEAR_MARGINS: case RTH_PROJ_TRI: case RTH_STATE:
++    case RTH_PRECISE_LINE: case RTH_SM2_POLIGONO:   /* SM2-Recomp: linee precise e Depth Bias */
+         return 1;
+     default:
+         return 0;
+@@ -12773,13 +13280,20 @@
+             if (in) glb_draw_textured_rect_scaled(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7],
+                                                   (uint16_t)v[8], (uint16_t)v[9], (uint16_t)v[10]);
+             break;
++        case RTH_PRECISE_LINE:   /* SM2-Recomp: PGXP sulle linee anche nei frame generati */
++            glb_set_precise_line(v[0], v[1], v[2], v[3], v[4]);
++            if (v[0]) s_sm2_fg_linee_precise++;
++            break;
++        case RTH_SM2_POLIGONO: glb_sm2_inizio_poligono(); break;   /* SM2-Recomp */
+         case RTH_LINE:
+             drawn |= in;
+             if (in) glb_draw_line(v[0], v[1], v[2], v[3], (uint16_t)v[4]);
++            else s_pl_valid = 0;   /* SM2-Recomp: le estremita' precise valgono solo per questa linea */
+             break;
+         case RTH_SHADED_LINE:
+             drawn |= in;
+             if (in) glb_draw_shaded_line(v[0], v[1], (uint16_t)v[2], v[3], v[4], (uint16_t)v[5]);
++            else s_pl_valid = 0;   /* SM2-Recomp */
+             break;
+         case RTH_FLAT_TRI: case RTH_GOURAUD_TRI: case RTH_TEX_TRI:
+         case RTH_SHADED_TEX_TRI: case RTH_PROJ_TRI: {
+@@ -12859,6 +13373,7 @@
+         (void)pc_pending;
+     }
+     s_rthx_prim = 0;
++    s_pl_valid = 0;   /* SM2-Recomp: niente estremita' precise lasciate dal frame generato al disegno vero */
+     flush_line_batch();
+     flush_flat_batch();
+     flush_tex_batch();
+@@ -13808,6 +14323,9 @@
+     const int real_dneed = s_depth_need_clear, real_dused = s_depth_used;
+     const float real_davg = s_depth_last_avg;
+     const uint64_t real_dtris = s_depth_tris, real_dclears = s_depth_clears;
++    /* SM2-Recomp: anche la Depth Bias (il passo e i poligoni contati) resta quella del disegno vero */
++    const int real_sm2_n = s_sm2_depth_n, real_sm2_nuovo = s_sm2_poligono_nuovo;
++    const uint64_t real_sm2_pol = s_sm2_poligoni_profondita;
+     uint64_t real_dreason[DCLR_N];
+     memcpy(real_dreason, s_depth_clear_reason, sizeof real_dreason);
+     const int real_dneed_reason = s_depth_need_reason;
+@@ -13917,6 +14435,8 @@
+     s_pc_valid = real_pc; s_pq_valid = real_pq; s_pz_valid = real_pz;
+     s_depth_need_clear = real_dneed; s_depth_used = real_dused; s_depth_last_avg = real_davg;
+     s_depth_tris = real_dtris; s_depth_clears = real_dclears;
++    s_sm2_depth_n = real_sm2_n; s_sm2_poligono_nuovo = real_sm2_nuovo;   /* SM2-Recomp: Depth Bias */
++    s_sm2_poligoni_profondita = real_sm2_pol;
+     memcpy(s_depth_clear_reason, real_dreason, sizeof real_dreason);
+     s_depth_need_reason = real_dneed_reason;
+     s_pack_dirty = pack; s_stencil_stale = sten; s_cpu_dirty = cpu;
+@@ -14578,6 +15098,14 @@
+     RTH_DIRECT_OR(RTH_REC(RTH_PRECISE, 0, en, x0, y0, x1, y1, x2, y2));
+     glb_set_precise_triangle(en, x0, y0, x1, y1, x2, y2);
+ }
++static void rtb_set_precise_line(int en, int32_t x0, int32_t y0, int32_t x1, int32_t y1) {   /* SM2-Recomp */
++    RTH_DIRECT_OR(RTH_REC(RTH_PRECISE_LINE, 0, en, x0, y0, x1, y1));
++    glb_set_precise_line(en, x0, y0, x1, y1);
++}
++static void rtb_sm2_inizio_poligono(void) {   /* SM2-Recomp: Depth Bias per poligono */
++    RTH_DIRECT_OR(RTH_REC(RTH_SM2_POLIGONO, 0, 0));
++    glb_sm2_inizio_poligono();
++}
+ static void rtb_set_depth_triangle(int en, float z0, float z1, float z2) {
+     if (rth_record_mode()) {
+         int32_t v[4] = { en, 0, 0, 0 };
+@@ -14782,6 +15310,8 @@
+     .set_semi_transparency = rtb_set_semi_transparency, .set_mask_bits = rtb_set_mask_bits,
+     .set_texture_window = rtb_set_texture_window, .set_color_modulation = rtb_set_color_modulation,
+     .set_precise_triangle = rtb_set_precise_triangle,
++    .set_precise_line = rtb_set_precise_line,   /* SM2-Recomp */
++    .sm2_inizio_poligono = rtb_sm2_inizio_poligono,   /* SM2-Recomp */
+     .set_perspective_triangle = rtb_set_perspective_triangle,
+     .set_dither = rtb_set_dither,
+     .fill_rect = rtb_fill_rect, .copy_rect = rtb_copy_rect,
+@@ -14828,6 +15358,8 @@
+     case RTH_TWIN:      glb_set_texture_window((uint32_t)v[0]); break;
+     case RTH_MOD:       glb_set_color_modulation(v[0], v[1], v[2], v[3]); break;
+     case RTH_PRECISE:   glb_set_precise_triangle(v[0], v[1], v[2], v[3], v[4], v[5], v[6]); break;
++    case RTH_PRECISE_LINE: glb_set_precise_line(v[0], v[1], v[2], v[3], v[4]); break;   /* SM2-Recomp */
++    case RTH_SM2_POLIGONO: glb_sm2_inizio_poligono(); break;   /* SM2-Recomp */
+     case RTH_PERSP: {
+         float q[3];
+         memcpy(q, &v[1], sizeof q);
+--- a/runtime/src/mdec.c
++++ b/runtime/src/mdec.c
+@@ -416,6 +416,12 @@
+ }
+ #endif
+ 
++/* SM2-Recomp 0.12: quantizzazione (qscale) dell'ultimo blocco decodificato, per il filtro dei filmati in tempo
++ * reale di gpu_gl_renderer.c (le soglie dello sblocco crescono con la quantizzazione). Non cambia la
++ * decodifica. */
++static uint32_t s_sm2_qscale = 0;
++uint32_t mdec_sm2_qscale(void) { return s_sm2_qscale; }
++
+ static int decode_rle_block(int16_t *block, const uint8_t *quant,
+                             uint32_t *pos, uint32_t end) {
+     memset(block, 0, 64 * sizeof(int16_t));
+@@ -432,6 +438,8 @@
+      * nonzero coeff gets the sign-magnitude rounding bias (ci<0 ? +8 : -8) the
+      * old +4/÷8 model omitted, and the <<4 domain feeds the >>3 IDCT matrix. */
+     uint32_t qscale = (word >> 10) & 0x3Fu;
++    /* SM2-Recomp: per il filtro dei filmati; 0xFE00 qui e' il riempimento alla fine dei dati, non un blocco */
++    if (word != 0xFE00u) s_sm2_qscale = qscale;
+     uint32_t k = 0;
+     int ci = sign_extend_10(word & 0x03FFu);
+     int q  = (int)quant[0];
+--- a/runtime/src/gpu.c
++++ b/runtime/src/gpu.c
+@@ -5017,6 +5017,53 @@
+     return sw_perspective_triangle_count();
+ }
+ 
++/* SM2-Recomp 0.12: PGXP "Disable on 2D Polygons" di DuckStation (variabile PSX_PGXP_DISABLE_2D=1, la passa il
++ * launcher di SM2-Recomp; spento di partenza come in DuckStation). Un poligono senza valid_w (vedi sotto: non
++ * proiettato tutto dalla GTE, cioe' interfaccia, scritte, poligoni fatti dal processore) si disegna tutto nella
++ * posizione nativa invece che con i soli vertici precisi, come in DuckStation. Resta il recupero dei bordi del
++ * widescreen, che non e' PGXP. */
++static int sm2_pgxp_disable_2d(void) {
++    static int v = -1;
++    if (v < 0) {
++        const char *e = getenv("PSX_PGXP_DISABLE_2D");
++        v = (e && *e && *e != '0') ? 1 : 0;
++        if (v) {
++            printf("[SM2-Recomp] PGXP: poligoni 2D nella posizione nativa (PSX_PGXP_DISABLE_2D)\n");
++            fflush(stdout);
++        }
++    }
++    return v;
++}
++
++/* SM2-Recomp 0.12: "valid_w" di DuckStation, per tutto il poligono. DuckStation decide per poligono, anche per un
++ * quadrilatero: valid_w = texture in prospettiva accese e, per ogni vertice, posizione precisa con la profondita'.
++ * Senza valid_w il poligono si disegna senza prospettiva (texture e colori), senza buffer di profondita' e, con
++ * "Disable on 2D Polygons", tutto nella posizione nativa. psxrecomp disegna un quadrilatero come due triangoli e
++ * decideva per triangolo: con un solo vertice senza profondita' una meta' era in prospettiva e l'altra no. Per un
++ * quadrilatero gp0_dispatch_command chiama sm2_poligono_inizio con i suoi quattro vertici prima di disegnarlo e
++ * rimette s_sm2_poligono a -1 dopo: -1 = nessun quadrilatero (un triangolo decide con i suoi tre vertici), 0 = valid_w
++ * vero, 1 = falso. La profondita' di un vertice e' quella che gli darebbe pgxp_get_precise_vertex, senza contarla
++ * nelle statistiche (pgxp_probe_precise_depth). Con PGXP spento s_sm2_poligono resta -1. */
++static int s_sm2_poligono = -1;
++extern uint16_t pgxp_probe_precise_depth(uint32_t addr, uint32_t packet_word, int32_t int_x, int32_t int_y);
++static void sm2_poligono_inizio(int a, int b, int c, int d) {
++    s_sm2_poligono = -1;
++    if (!gte_geometry_correction_enabled() && !s_texture_correction_enabled)
++        return;
++    s_sm2_poligono = 1;
++    if (!s_texture_correction_enabled || gp0_cmd_source_addr == 0xFFFFFFFFu)
++        return;
++    const int idx[4] = { a, b, c, d };
++    for (int i = 0; i < 4; i++) {
++        const uint32_t word = gp0_cmd_buf[idx[i]];
++        int32_t raw_x, raw_y;
++        parse_vertex(word, &raw_x, &raw_y);
++        if (!pgxp_probe_precise_depth(gp0_cmd_source_addr + (uint32_t)idx[i] * 4u, word, raw_x, raw_y))
++            return;
++    }
++    s_sm2_poligono = 0;
++}
++
+ /* Per-vertex precise positions (PGXP, docs/ENHANCEMENTS.md G1). Each of the three
+  * packet words is resolved independently: the address-keyed dataflow shadow
+  * first (validated against the actual word — exact provenance, survives
+@@ -5087,6 +5134,8 @@
+     int32_t fx[3], fy[3];
+     float vz[3] = {0, 0, 0};
+     int any_precise = 0, n_precise = 0;
++    int32_t sm2_fx[3], sm2_fy[3];   /* SM2-Recomp: le posizioni senza PGXP (Disable on 2D Polygons) */
++    int sm2_largo = 0;
+     PGXPTriRecord rec;
+     memset(&rec, 0, sizeof rec);
+     for (int i = 0; i < 3; i++) {
+@@ -5116,8 +5165,14 @@
+             if (full > 0.0f) vz[i] = full;
+         }
+         /* Native-wide edge recovery is not PGXP: it does not count in n_precise. */
+-        if (native_wide_projection_x(addr, word, raw_x, raw_y, &px))
++        int32_t sm2_nx = raw_x * 65536;   /* SM2-Recomp: la x senza PGXP (con il recupero del widescreen) */
++        if (native_wide_projection_x(addr, word, raw_x, raw_y, &px)) {
+             any_precise = 1;
++            sm2_nx = px;
++            sm2_largo = 1;
++        }
++        sm2_fx[i] = (int32_t)((int64_t)sm2_nx + (int64_t)(vx[i] - raw_x) * 65536);
++        sm2_fy[i] = (int32_t)((int64_t)vy[i] * 65536);
+         fx[i] = (int32_t)((int64_t)px + (int64_t)(vx[i] - raw_x) * 65536);
+         fy[i] = (int32_t)((int64_t)py + (int64_t)(vy[i] - raw_y) * 65536);
+         rec.src[i] = (uint8_t)src;
+@@ -5129,6 +5184,22 @@
+         rec.y16[i] = fy[i];
+         rec.z[i] = sz; /* receipt retains the hardware SZ, not the visual depth */
+     }
++    /* SM2-Recomp 0.12: valid_w di DuckStation (vedi s_sm2_poligono): per un quadrilatero quello dei suoi quattro
++     * vertici, per un triangolo texture in prospettiva accese e profondita' su tutti e tre. Senza valid_w, con
++     * "Disable on 2D Polygons" (sm2_pgxp_disable_2d), il poligono torna tutto nella posizione nativa e nei
++     * contatori conta come nativo; e niente buffer di profondita' (sotto). */
++    const int sm2_valid_w = s_sm2_poligono >= 0 ? !s_sm2_poligono
++                            : (s_texture_correction_enabled && vz[0] && vz[1] && vz[2]);
++    if (geometry && n_precise > 0 && !sm2_valid_w && sm2_pgxp_disable_2d()) {
++        for (int i = 0; i < 3; i++) {
++            fx[i] = sm2_fx[i];
++            fy[i] = sm2_fy[i];
++            rec.x16[i] = fx[i];
++            rec.y16[i] = fy[i];
++        }
++        any_precise = sm2_largo;
++        n_precise = 0;
++    }
+     if (geometry) {
+         pgxp_note_triangle(n_precise);   /* G1.1 crack exposure: mixed share */
+         rec.frame = (uint32_t)s_frame_count;
+@@ -5136,7 +5207,7 @@
+         rec.op = (uint8_t)(gp0_cmd_buf[0] >> 24);
+         pgxp_note_triangle_detail(&rec);
+     }
+-    const int depth = want_depth && vz[0] && vz[1] && vz[2];
++    const int depth = want_depth && sm2_valid_w && vz[0] && vz[1] && vz[2];   /* SM2-Recomp: con valid_w */
+     if (!any_precise && !depth) {
+         gr_set_precise_triangle(0, 0,0, 0,0, 0,0);
+         return;
+@@ -5213,6 +5284,9 @@
+     s_texcorr.attempts++;
+     if (!s_texture_correction_enabled) { s_texcorr.no_correction++; return; }
+     if (gp0_cmd_source_addr == 0xFFFFFFFFu) { s_texcorr.no_source++; return; }
++    /* SM2-Recomp 0.12: quadrilatero senza valid_w (vedi s_sm2_poligono): niente prospettiva per tutte e due le
++     * meta', come in DuckStation. */
++    if (s_sm2_poligono == 1) { s_texcorr.no_depth++; return; }
+     int indices[3] = { i0, i1, i2 };
+     uint16_t z[3];
+     float depth[3];
+@@ -5992,6 +6066,77 @@
+     }
+ }
+ 
++/* ---- SM2-Recomp 0.12: PGXP sulle linee, come DuckStation -------------------------------------------------
++ * DuckStation (src/core/gpu.cpp, HandleRenderLineCommand e HandleRenderPolyLineCommand) con PGXP acceso disegna ogni
++ * linea con le estremita' nelle posizioni precise (CPU::PGXP::GetPreciseVertex, la stessa ricerca dei vertici dei
++ * poligoni, con la stessa tolleranza; dove non c'e' la posizione precisa resta quella nativa). Spider-Man 2 disegna
++ * linee in 34 livelli su 44 (comandi 0x50 e 0x52, misurato il 6/11/2026): senza, a risoluzione alta restano
++ * agganciate ai pixel della PS1 mentre il resto della geometria si muove liscio. Qui la posizione precisa di ogni
++ * estremita' (pgxp_get_precise_line_vertex di pgxp.cpp, contata a parte) va al disegno con gr_set_precise_line subito
++ * prima della linea (OpenGL, i frame generati del movimento fluido e Vulkan). Il disegno software resta nella
++ * posizione nativa (come il disegno software di DuckStation). Con PGXP spento (geometria) non cambia niente. */
++extern int pgxp_get_precise_line_vertex(uint32_t addr, uint32_t packet_word, int32_t int_x, int32_t int_y,
++                                        int32_t *x16, int32_t *y16);
++static uint64_t s_sm2_linee[3];   /* con PGXP acceso: linee disegnate, con le due estremita' precise, con una sola */
++void sm2_pgxp_linee_stats(uint64_t out[3]) {
++    for (int i = 0; i < 3; i++) out[i] = s_sm2_linee[i];
++}
++/* Un'estremita' (x, y: le coordinate intere passate al disegno; raw_x, raw_y: quelle del pacchetto): 16.16 in x16,
++ * y16, 1 se precisa. */
++static int sm2_estremita(uint32_t addr, uint32_t word, int32_t raw_x, int32_t raw_y, int32_t x, int32_t y,
++                         int32_t *x16, int32_t *y16) {
++    int32_t px, py;
++    *x16 = x * 65536;
++    *y16 = y * 65536;
++    if (addr == 0xFFFFFFFFu ||
++        pgxp_get_precise_line_vertex(addr, word, raw_x, raw_y, &px, &py) == PGXP_SRC_NATIVE)
++        return 0;
++    *x16 = (int32_t)((int64_t)px + (int64_t)(x - raw_x) * 65536);
++    *y16 = (int32_t)((int64_t)py + (int64_t)(y - raw_y) * 65536);
++    return 1;
++}
++/* Subito prima di gr_draw_line o gr_draw_shaded_line: le estremita' precise di quella linea (se ce n'e' almeno una). */
++static void sm2_linea_precisa(int p0, int32_t x0_16, int32_t y0_16, int p1, int32_t x1_16, int32_t y1_16) {
++    s_sm2_linee[0]++;
++    if (p0 && p1) s_sm2_linee[1]++;
++    else if (p0 || p1) s_sm2_linee[2]++;
++    if (p0 || p1) gr_set_precise_line(1, x0_16, y0_16, x1_16, y1_16);
++}
++/* Una linea di un comando 0x40-0x47 o 0x50-0x57: i0, i1 = indici delle parole dei due vertici nel comando. */
++static void sm2_linea_comando(int i0, int i1, int32_t raw_x0, int32_t raw_y0, int32_t x0, int32_t y0,
++                              int32_t raw_x1, int32_t raw_y1, int32_t x1, int32_t y1) {
++    if (!gte_geometry_correction_enabled()) return;
++    const uint32_t base = gp0_cmd_source_addr;
++    int32_t a16, b16, c16, d16;
++    const int p0 = sm2_estremita(base == 0xFFFFFFFFu ? base : base + (uint32_t)i0 * 4u, gp0_cmd_buf[i0],
++                                 raw_x0, raw_y0, x0, y0, &a16, &b16);
++    const int p1 = sm2_estremita(base == 0xFFFFFFFFu ? base : base + (uint32_t)i1 * 4u, gp0_cmd_buf[i1],
++                                 raw_x1, raw_y1, x1, y1, &c16, &d16);
++    sm2_linea_precisa(p0, a16, b16, p1, c16, d16);
++}
++/* Polilinee (0x48-0x4F, 0x58-0x5F): ogni parola arriva da sola (indirizzo in gp0_next_source_addr); la posizione
++ * precisa del vertice di prima vale solo se le sue coordinate sono ancora quelle di polyline_prev_x/y. */
++static int32_t s_sm2_pl_x, s_sm2_pl_y, s_sm2_pl_x16, s_sm2_pl_y16;
++static int s_sm2_pl_p = 0;
++static void sm2_polilinea_vertice(uint32_t val, int32_t raw_x, int32_t raw_y, int32_t x, int32_t y, int disegna,
++                                  int32_t prev_x, int32_t prev_y) {
++    if (!gte_geometry_correction_enabled()) {
++        s_sm2_pl_p = 0;
++        return;
++    }
++    int32_t x16, y16;
++    const int p = sm2_estremita(gp0_next_source_addr, val, raw_x, raw_y, x, y, &x16, &y16);
++    if (disegna) {
++        const int pp = s_sm2_pl_p && s_sm2_pl_x == prev_x && s_sm2_pl_y == prev_y;
++        sm2_linea_precisa(pp, pp ? s_sm2_pl_x16 : prev_x * 65536, pp ? s_sm2_pl_y16 : prev_y * 65536, p, x16, y16);
++    }
++    s_sm2_pl_p = p;
++    s_sm2_pl_x = x;
++    s_sm2_pl_y = y;
++    s_sm2_pl_x16 = x16;
++    s_sm2_pl_y16 = y16;
++}
++
+ /* Execute mono line (GP0 0x40-0x47) — Bresenham */
+ static void gp0_exec_mono_line(void) {
+     int semi_trans = (gp0_cmd_buf[0] >> 25) & 1;
+@@ -6000,6 +6145,7 @@
+     parse_vertex(gp0_cmd_buf[1], &x0, &y0);
+     parse_vertex(gp0_cmd_buf[2], &x1, &y1);
+     if (psx_gpu_line_oversize(x0, y0, x1, y1)) return;
++    const int32_t sm2_rx0 = x0, sm2_ry0 = y0, sm2_rx1 = x1, sm2_ry1 = y1;   /* SM2-Recomp: PGXP sulle linee */
+     if (x0 == x1 && ws_local_viewport_divider(x0, y0 < y1 ? y0 : y1,
+             x0 + 1, (y0 > y1 ? y0 : y1) + 1, color, semi_trans)) {
+         gr_wide_disable_target();
+@@ -6019,6 +6165,7 @@
+         if (draw_area_out_bbox(lx, ly, 2)) return;
+     }
+     gr_set_semi_transparency(semi_trans, (int)semi_transparency);
++    sm2_linea_comando(1, 2, sm2_rx0, sm2_ry0, x0, y0, sm2_rx1, sm2_ry1, x1, y1);   /* SM2-Recomp */
+     gr_draw_line(x0, y0, x1, y1, color);
+ }
+ 
+@@ -6031,6 +6178,7 @@
+     parse_vertex(gp0_cmd_buf[1], &x0, &y0);
+     parse_vertex(gp0_cmd_buf[3], &x1, &y1);
+     if (psx_gpu_line_oversize(x0, y0, x1, y1)) return;
++    const int32_t sm2_rx0 = x0, sm2_ry0 = y0, sm2_rx1 = x1, sm2_ry1 = y1;   /* SM2-Recomp: PGXP sulle linee */
+     int32_t vx[2] = { x0, x1 };
+     ws_nw_hud_shift_vertices(vx, 2);
+     x0 = vx[0]; x1 = vx[1];
+@@ -6041,6 +6189,7 @@
+         if (draw_area_out_bbox(lx, ly, 2)) return;
+     }
+     gr_set_semi_transparency(semi_trans, (int)semi_transparency);
++    sm2_linea_comando(1, 3, sm2_rx0, sm2_ry0, x0, y0, sm2_rx1, sm2_ry1, x1, y1);   /* SM2-Recomp */
+     gr_draw_shaded_line(x0, y0, c0, x1, y1, c1);
+ }
+ 
+@@ -7639,7 +7788,13 @@
+     }
+ }
+ 
++/* SM2-Recomp 0.12: Depth Bias contata per poligono come DuckStation (gpu_hw.cpp, DrawPolygon): con il buffer di
++ * profondita' di PGXP acceso ogni comando di poligono (0x20-0x3F, anche un quadrilatero, che il motore disegna come
++ * due triangoli) e' un passo solo; lo dice al disegno gr_sm2_inizio_poligono. */
++extern int gl_renderer_get_pgxp_depth(void);
+ static void gp0_dispatch_command(uint8_t opcode) {
++    if (opcode >= 0x20 && opcode <= 0x3F && gl_renderer_get_pgxp_depth())
++        gr_sm2_inizio_poligono();   /* SM2-Recomp */
+     switch (opcode) {
+         case 0x00:
+         case 0x01:
+@@ -7682,10 +7837,14 @@
+             gp0_exec_textured_tri();
+             break;
+         case 0x28: case 0x29: case 0x2A: case 0x2B:
++            sm2_poligono_inizio(1, 2, 3, 4);   /* SM2-Recomp: valid_w per tutto il quadrilatero */
+             gp0_exec_mono_quad();
++            s_sm2_poligono = -1;
+             break;
+         case 0x2C: case 0x2D: case 0x2E: case 0x2F:
++            sm2_poligono_inizio(1, 3, 5, 7);   /* SM2-Recomp: valid_w per tutto il quadrilatero */
+             gp0_exec_textured_quad();
++            s_sm2_poligono = -1;
+             break;
+         case 0x30: case 0x31: case 0x32: case 0x33:
+             gp0_exec_shaded_tri();
+@@ -7694,10 +7853,14 @@
+             gp0_exec_shaded_textured_tri();
+             break;
+         case 0x38: case 0x39: case 0x3A: case 0x3B:
++            sm2_poligono_inizio(1, 3, 5, 7);   /* SM2-Recomp: valid_w per tutto il quadrilatero */
+             gp0_exec_shaded_quad();
++            s_sm2_poligono = -1;
+             break;
+         case 0x3C: case 0x3D: case 0x3E: case 0x3F:
++            sm2_poligono_inizio(1, 4, 7, 10);   /* SM2-Recomp: valid_w per tutto il quadrilatero */
+             gp0_exec_shaded_textured_quad();
++            s_sm2_poligono = -1;
+             break;
+ 
+         /* Lines */
+@@ -7920,10 +8083,14 @@
+         }
+         int32_t x, y;
+         parse_vertex(val, &x, &y);
++        const int32_t sm2_rx = x, sm2_ry = y;   /* SM2-Recomp: PGXP sulle linee */
+         x += draw_offset_x; y += draw_offset_y;
+-        if (polyline_has_prev &&
+-            !psx_gpu_line_oversize(polyline_prev_x, polyline_prev_y, x, y)) {
+-            gr_draw_line(polyline_prev_x, polyline_prev_y, x, y, polyline_color);
++        {
++            const int sm2_disegna = polyline_has_prev &&
++                !psx_gpu_line_oversize(polyline_prev_x, polyline_prev_y, x, y);
++            sm2_polilinea_vertice(val, sm2_rx, sm2_ry, x, y, sm2_disegna, polyline_prev_x, polyline_prev_y);
++            if (sm2_disegna)
++                gr_draw_line(polyline_prev_x, polyline_prev_y, x, y, polyline_color);
+         }
+         polyline_prev_x = x; polyline_prev_y = y;
+         if (polyline_has_prev < 2) polyline_has_prev++;
+@@ -7944,7 +8111,9 @@
+             /* First vertex */
+             int32_t x, y;
+             parse_vertex(val, &x, &y);
++            const int32_t sm2_rx = x, sm2_ry = y;   /* SM2-Recomp: PGXP sulle linee */
+             x += draw_offset_x; y += draw_offset_y;
++            sm2_polilinea_vertice(val, sm2_rx, sm2_ry, x, y, 0, 0, 0);
+             polyline_prev_x = x; polyline_prev_y = y;
+             polyline_prev_c = polyline_color;
+             polyline_has_prev = 1;
+@@ -7965,8 +8134,11 @@
+         {
+             int32_t x, y;
+             parse_vertex(val, &x, &y);
++            const int32_t sm2_rx = x, sm2_ry = y;   /* SM2-Recomp: PGXP sulle linee */
+             x += draw_offset_x; y += draw_offset_y;
+-            if (!psx_gpu_line_oversize(polyline_prev_x, polyline_prev_y, x, y))
++            const int sm2_disegna = !psx_gpu_line_oversize(polyline_prev_x, polyline_prev_y, x, y);
++            sm2_polilinea_vertice(val, sm2_rx, sm2_ry, x, y, sm2_disegna, polyline_prev_x, polyline_prev_y);
++            if (sm2_disegna)
+                 gr_draw_shaded_line(polyline_prev_x, polyline_prev_y,
+                                     polyline_prev_c, x, y, polyline_color);
+             polyline_prev_x = x; polyline_prev_y = y;
+@@ -8008,6 +8180,7 @@
+         polyline_color = rgb888_to_rgb555(val & 0xFFFFFFu);
+         polyline_prev_c = polyline_color;
+         polyline_has_prev = 0;
++        s_sm2_pl_p = 0;   /* SM2-Recomp: PGXP sulle linee, polilinea nuova */
+         gr_set_semi_transparency(polyline_semi_trans, (int)semi_transparency);
+         gp0_state = shaded ? GP0_POLYLINE_SHADED : GP0_POLYLINE_MONO;
+         gp0_draw_count++;
+--- a/runtime/src/pgxp.cpp
++++ b/runtime/src/pgxp.cpp
+@@ -1882,6 +1882,28 @@
+                                         &x16, &y16, &sz, 1);
+ }
+ 
++/* SM2-Recomp 0.12 (valid_w di DuckStation per tutto il poligono, sm2_poligono_inizio in runtime/src/gpu.c): la
++ * profondita' che pgxp_get_precise_vertex darebbe a questo vertice (0 = nessuna), senza contarla nelle statistiche. */
++extern "C" uint16_t pgxp_probe_precise_depth(uint32_t addr, uint32_t packet_word,
++                                             int32_t int_x, int32_t int_y) {
++    int32_t x16, y16;
++    uint16_t sz = 0;
++    (void)pgxp_get_precise_vertex_impl(addr, packet_word, int_x, int_y,
++                                       &x16, &y16, &sz, 1);
++    return sz;
++}
++
++/* SM2-Recomp 0.12 (PGXP sulle linee come DuckStation, runtime/src/gpu.c): la posizione precisa di un'estremita' di una
++ * linea, con la stessa ricerca di pgxp_get_precise_vertex (e la stessa tolleranza), senza contarla nelle statistiche
++ * dei vertici dei poligoni: le linee hanno i loro contatori (sm2_pgxp_linee_stats in gpu.c). */
++extern "C" int pgxp_get_precise_line_vertex(uint32_t addr, uint32_t packet_word,
++                                            int32_t int_x, int32_t int_y,
++                                            int32_t *x16, int32_t *y16) {
++    uint16_t sz = 0;
++    return pgxp_get_precise_vertex_impl(addr, packet_word, int_x, int_y,
++                                        x16, y16, &sz, 1);
++}
++
+ /* ------------------------------------------------------------------------- */
+ /* Legacy v14 SWC2 tracker — kept as the base-flavour feed                    */
+ /* ------------------------------------------------------------------------- */
+--- a/runtime/include/gpu_render.h
++++ b/runtime/include/gpu_render.h
+@@ -57,6 +57,14 @@
+                              int32_t x0, int32_t y0,
+                              int32_t x1, int32_t y1,
+                              int32_t x2, int32_t y2);
++/* SM2-Recomp 0.12: PGXP sulle linee come DuckStation. Posizioni 16.16 precise delle due estremita' della
++ * PROSSIMA linea (gr_draw_line o gr_draw_shaded_line); le posizioni intere restano quelle fedeli per tutto il
++ * resto. enabled == 0 la toglie; i backend che non la hanno (disegno software) la ignorano. */
++void gr_set_precise_line(int enabled, int32_t x0, int32_t y0, int32_t x1, int32_t y1);
++/* SM2-Recomp 0.12: Depth Bias per poligono come DuckStation. gpu.c la chiama prima di ogni comando di poligono
++ * (0x20-0x3F) quando il buffer di profondita' di PGXP e' acceso: un quadrilatero, disegnato come due
++ * triangoli, e' un poligono solo. I backend che non la hanno la ignorano. */
++void gr_sm2_inizio_poligono(void);
+ /* Perspective-correct UV weights for the NEXT triangle ([video]
+  * perspective_texturing). q[i] is the normalized 1/z homogeneous weight at
+  * vertex i. enabled == 0 restores the PS1's affine UV interpolation. */
+@@ -247,6 +255,10 @@
+     void (*wide_feedback_rect)(int src_base, int src_x, int src_y, int dst_x,
+                                int dst_y, int w, int h, int r, int g, int b,
+                                int raw, int semi);
++    /* SM2-Recomp 0.12, in fondo: gr_set_precise_line (PGXP sulle linee). NULL = linee nella posizione nativa. */
++    void (*set_precise_line)(int enabled, int32_t x0, int32_t y0, int32_t x1, int32_t y1);
++    /* SM2-Recomp 0.12, in fondo: gr_sm2_inizio_poligono (Depth Bias per poligono). NULL = niente. */
++    void (*sm2_inizio_poligono)(void);
+ } GpuRenderBackend;
+ 
+ enum { GR_HD_NOTE_INVALIDATE = 0, GR_HD_NOTE_TRACK_UPLOAD = 1,
+--- a/runtime/src/gpu_render.c
++++ b/runtime/src/gpu_render.c
+@@ -173,6 +173,14 @@
+     if (g_b->set_precise_triangle)
+         g_b->set_precise_triangle(enabled, x0, y0, x1, y1, x2, y2);
+ }
++void gr_set_precise_line(int enabled, int32_t x0, int32_t y0, int32_t x1, int32_t y1) {   /* SM2-Recomp */
++    if (g_b->set_precise_line)
++        g_b->set_precise_line(enabled, x0, y0, x1, y1);
++}
++void gr_sm2_inizio_poligono(void) {   /* SM2-Recomp: Depth Bias per poligono */
++    if (g_b->sm2_inizio_poligono)
++        g_b->sm2_inizio_poligono();
++}
+ void gr_set_perspective_triangle(int enabled, float q0, float q1, float q2) {
+     g_hd_perspective = enabled && q0 > 0 && q1 > 0 && q2 > 0;
+     if (g_b->set_perspective_triangle)
+--- a/runtime/src/gte.cpp
++++ b/runtime/src/gte.cpp
+@@ -795,6 +795,49 @@
+ }
+ extern "C" void gte_render_view_set(const int32_t xyz[3]) {
+     for (int i = 0; i < 3; i++) s_render_view[i] = s_render_pose.translation[i] = xyz[i];
++}
++
++/* ---- SM2-Recomp 0.12: "Normalize Depth Scale" di DuckStation --------------------------------------------------
++ * DuckStation (src/core/gte.cpp, RTPS_PGXP; voce "Normalize Depth Scale", PGXPNormalizeDepth): alcuni giochi scalano
++ * tutta la trasformazione di ogni oggetto per restare nei 16 bit della GTE; la profondita' precisa di PGXP viene
++ * divisa per la lunghezza della riga Z della matrice di rotazione (RT[2]; 4096 = 1,0), cosi' torna confrontabile tra
++ * oggetti diversi (buffer di profondita') e, con "sempre", anche per le texture in prospettiva dove si toccano oggetti
++ * scalati diversamente. Spider-Man 2 scala le trasformazioni in 34 livelli su 44 (da 0,05 a 4,7; misurato il
++ * 6/11/2026). Le posizioni sullo schermo non cambiano. PSX_PGXP_NORMALIZE_DEPTH (la passa il launcher di
++ * SM2-Recomp): 0 = spenta (di partenza: l'"Automatico" di DuckStation, che per Spider-Man 2 non la accende), 1 = solo
++ * con il buffer di profondita' ("Depth Buffer Only"), 2 = sempre ("Depth Buffer and Texture Correction"). Il comando
++ * pgxp del server di debug la cambia (normalize_depth) e conta i vertici normalizzati. */
++static int s_sm2_norm = -1;
++static unsigned long long s_sm2_norm_n = 0;
++extern "C" int gl_renderer_get_pgxp_depth(void);
++static int sm2_norm_modo(void) {
++    if (s_sm2_norm < 0) {
++        const char *e = std::getenv("PSX_PGXP_NORMALIZE_DEPTH");
++        const int v = (e && *e) ? std::atoi(e) : 0;
++        s_sm2_norm = v < 0 ? 0 : (v > 2 ? 2 : v);
++        if (s_sm2_norm) {
++            std::printf("[SM2-Recomp] PGXP: profondita' normalizzata (%s, PSX_PGXP_NORMALIZE_DEPTH)\n",
++                        s_sm2_norm == 2 ? "sempre" : "solo con il buffer di profondita'");
++            std::fflush(stdout);
++        }
++    }
++    return s_sm2_norm;
++}
++extern "C" void sm2_pgxp_set_normalize_depth(int modo) { s_sm2_norm = modo < 0 ? 0 : (modo > 2 ? 2 : modo); }
++extern "C" int sm2_pgxp_normalize_depth(void) { return sm2_norm_modo(); }
++extern "C" unsigned long long sm2_pgxp_depth_normalized(void) { return s_sm2_norm_n; }
++/* La profondita' che PGXP ricorda per questo vertice (SZ3 o SZ3 normalizzato); scala = quella usata (1 = nessuna). */
++static uint16_t sm2_pgxp_normalizza(const GTEState *gte, uint16_t sz, double *scala) {
++    *scala = 1.0;
++    const int modo = sm2_norm_modo();
++    if (!sz || !modo || (modo == 1 && !gl_renderer_get_pgxp_depth())) return sz;
++    const double r0 = gte->RT[2][0], r1 = gte->RT[2][1], r2 = gte->RT[2][2];
++    const double s = std::sqrt(r0 * r0 + r1 * r1 + r2 * r2) / 4096.0;
++    if (!(s > 0.0)) return sz;
++    *scala = s;
++    if (std::fabs(s - 1.0) > 1e-6) s_sm2_norm_n++;
++    const double z = std::nearbyint((double)sz / s);
++    return (uint16_t)(z < 1.0 ? 1.0 : (z > 65535.0 ? 65535.0 : z));
+ }
+ 
+ static void gte_rtp_record(const GTEState* g, uint32_t cmd) {
+@@ -1289,8 +1332,12 @@
+                 py16 = ey16;
+             }
+         }
+-        pgxp_gte_push_sxy(px16, py16, gte->SZ[3], (uint32_t)gte->SXY[2]);
+-        if (unclamped_projection) pgxp_gte_mark_unclamped((uint32_t)(mac3 >> 12));
++        /* SM2-Recomp 0.12: "Normalize Depth Scale" di DuckStation (sm2_pgxp_normalizza, sopra) */
++        double sm2_scala = 1.0;
++        const uint16_t sm2_sz = sm2_pgxp_normalizza(gte, gte->SZ[3], &sm2_scala);
++        pgxp_gte_push_sxy(px16, py16, sm2_sz, (uint32_t)gte->SXY[2]);
++        if (unclamped_projection)
++            pgxp_gte_mark_unclamped((uint32_t)std::llround((double)(mac3 >> 12) / sm2_scala));
+         if (!proj_override && pgxp_projection_tracking() && shift == 12 && !lm) {
+             const double z = (double)(mac3 >> 12);
+             const double h_proj = (double)gte_h_scaled(gte);
+--- a/runtime/src/debug_server.c
++++ b/runtime/src/debug_server.c
+@@ -5814,6 +5814,18 @@
+  * "position_fallback":0|1,"preserve_projection":0|1,"culling":0|1}. Fields
+  * are optional; the reply echoes the resulting state (same shape as
+  * geom_correction's "pgxp" object, flattened). */
++/* SM2-Recomp 0.12 (punto 8 di patch_psxrecomp_012.py): PGXP sulle linee, normalizzazione della profondita' e Depth
++ * Bias come DuckStation. */
++extern void sm2_pgxp_linee_stats(uint64_t out[3]);
++extern void sm2_pgxp_set_normalize_depth(int modo);
++extern int sm2_pgxp_normalize_depth(void);
++extern unsigned long long sm2_pgxp_depth_normalized(void);
++extern void gl_renderer_set_pgxp_depth_bias(float b);
++extern float gl_renderer_get_pgxp_depth_bias(void);
++extern uint64_t gl_renderer_sm2_depth_polygons(void);
++extern uint64_t gl_renderer_sm2_fg_precise_lines(void);
++extern uint64_t vk_renderer_sm2_precise_lines(void);
++
+ static void handle_pgxp(int id, const char *json)
+ {
+     /* Live toggles for the one-toggle-at-a-time A/B protocol (docs/ENHANCEMENTS.md
+@@ -5849,19 +5861,36 @@
+         if (*p == '-' || (*p >= '0' && *p <= '9') || *p == '.')
+             pgxp_set_tolerance((float)strtod(p, NULL));
+     }
++    /* SM2-Recomp 0.12: le due voci nuove di DuckStation (normalizzazione della profondita' 0/1/2, Depth Bias). */
++    int sm2_nd = json_get_int(json, "normalize_depth", -1);
++    if (sm2_nd >= 0)
++        sm2_pgxp_set_normalize_depth(sm2_nd);
++    p = strstr(json, "\"depth_bias\"");
++    if (p) {
++        p += 12;
++        while (*p == ' ' || *p == ':' || *p == '"') p++;
++        if ((*p >= '0' && *p <= '9') || *p == '.')
++            gl_renderer_set_pgxp_depth_bias((float)strtod(p, NULL));
++    }
+     /* Renderer side (G1.14): depth-buffer state and cumulative counts of
+      * depth-tested triangles, depth clears and seam-expanded triangles. */
+     uint64_t depth_tris = 0, depth_clears = 0, seam_tris = 0;
+     gl_renderer_pgxp_render_stats(&depth_tris, &depth_clears, &seam_tris);
+     uint64_t dr[5];
+     gl_renderer_pgxp_depth_clear_reasons(dr);
++    uint64_t sm2_l[3];   /* SM2-Recomp: linee disegnate, con le estremita' precise, con una sola */
++    sm2_pgxp_linee_stats(sm2_l);
+     send_fmt("{\"id\":%d,\"ok\":true,\"enabled\":%d,\"cpu_mode\":%d,"
+              "\"tolerance\":%.3f,\"position_fallback\":%d,"
+              "\"preserve_projection\":%d,\"culling\":%d,"
+              "\"suppress\":%u,\"active\":%d,\"depth_buffer\":%d,"
+              "\"depth_tris\":%llu,\"depth_clears\":%llu,\"seam_tris\":%llu,"
+              "\"depth_clear_reasons\":{\"config\":%llu,\"area\":%llu,\"fill\":%llu,"
+-             "\"threshold\":%llu,\"present\":%llu}}",
++             "\"threshold\":%llu,\"present\":%llu},"
++             "\"sm2_linee\":%llu,\"sm2_linee_precise\":%llu,\"sm2_linee_miste\":%llu,"
++             "\"sm2_normalizza\":%d,\"sm2_profondita_normalizzate\":%llu,\"sm2_depth_bias\":%.3f,"
++             "\"sm2_poligoni_profondita\":%llu,\"sm2_linee_frame_generati\":%llu,"
++             "\"sm2_linee_vulkan\":%llu}",
+              id, pgxp_enabled(), pgxp_cpu_mode(), (double)pgxp_tolerance(),
+              pgxp_position_fallback(), pgxp_preserve_projection(),
+              pgxp_culling(),
+@@ -5870,7 +5899,13 @@
+              (unsigned long long)depth_clears, (unsigned long long)seam_tris,
+              (unsigned long long)dr[0], (unsigned long long)dr[1],
+              (unsigned long long)dr[2], (unsigned long long)dr[3],
+-             (unsigned long long)dr[4]);
++             (unsigned long long)dr[4],
++             (unsigned long long)sm2_l[0], (unsigned long long)sm2_l[1], (unsigned long long)sm2_l[2],
++             sm2_pgxp_normalize_depth(), (unsigned long long)sm2_pgxp_depth_normalized(),
++             (double)gl_renderer_get_pgxp_depth_bias(),
++             (unsigned long long)gl_renderer_sm2_depth_polygons(),
++             (unsigned long long)gl_renderer_sm2_fg_precise_lines(),
++             (unsigned long long)vk_renderer_sm2_precise_lines());
+ }
+ 
+ static void handle_gpu_state(int id, const char *json)
+@@ -10623,6 +10658,16 @@
+         int gw = 0, gh = 0;
+         int n = gl_renderer_read_display_hires((int)di.display_x, (int)di.display_y,
+                                                (int)w, (int)h, argb,
++                                               (int)((size_t)ow * oh), &gw, &gh);
++        if (n > 0 && (uint32_t)gw == ow && (uint32_t)gh == oh) goto encode;
++    }
++    /* SM2-Recomp 0.12: anche Vulkan tiene la risoluzione interna solo nella sua immagine (gpu_vk_renderer.c): letta da
++     * li', come per OpenGL (prima ripiegava sulla risoluzione della PS1); serve a provare le linee di PGXP. */
++    if (gr_backend() == GR_BACKEND_VULKAN && scale > 1) {
++        extern int vk_renderer_read_display_hires(int x, int y, int w, int h, uint32_t *out, int cap_px,
++                                                  int *out_w, int *out_h);
++        int gw = 0, gh = 0;
++        int n = vk_renderer_read_display_hires((int)di.display_x, (int)di.display_y, (int)w, (int)h, argb,
+                                                (int)((size_t)ow * oh), &gw, &gh);
+         if (n > 0 && (uint32_t)gw == ow && (uint32_t)gh == oh) goto encode;
+     }
+--- a/runtime/src/gpu_vk_renderer.c
++++ b/runtime/src/gpu_vk_renderer.c
+@@ -48,6 +48,9 @@
+ void vk_renderer_set_present_mode(int m){(void)m;}
+ void vk_renderer_set_display_aspect(int n,int d){(void)n;(void)d;}
+ int  vk_perf_json(char *out,int cap,int count){(void)count; return cap>2?snprintf(out,cap,"[]"):0;}
++/* SM2-Recomp 0.12: senza Vulkan nessuna linea disegnata da Vulkan e nessuna immagine alla risoluzione interna. */
++uint64_t vk_renderer_sm2_precise_lines(void) { return 0; }
++int  vk_renderer_read_display_hires(int x,int y,int w,int h,uint32_t *o,int c,int *ow,int *oh){(void)x;(void)y;(void)w;(void)h;(void)o;(void)c;(void)ow;(void)oh;return 0;}
+ const GpuRenderBackend *vk_backend_get(void) { return 0; }
+ 
+ #else  /* PSX_HAVE_VULKAN */
+@@ -2609,6 +2612,37 @@
+     s_gpu_dirty = 0;
+ }
+ 
++/* SM2-Recomp 0.12: l'immagine alla risoluzione interna per il server di debug (screenshot_hires), come
++ * gl_renderer_read_display_hires per OpenGL: la zona dello schermo dell'immagine grande della VRAM (RGBA8, s_scale
++ * volte la PS1) copiata in un buffer e girata in ARGB. Serve alle prove (le linee di PGXP con Vulkan); il gioco non la
++ * usa. Restituisce i pixel scritti, 0 se non si puo' (allora screenshot_hires fa come prima). */
++int vk_renderer_read_display_hires(int x, int y, int w, int h, uint32_t *out, int cap_px, int *ow, int *oh) {
++    if (!s_ctx_ok || !s_ready || !out || w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > VRAM_W || y + h > VRAM_H)
++        return 0;
++    const int S = s_scale, W = w * S, H = h * S;
++    if ((long long)W * H > (long long)cap_px) return 0;
++    flush_cpu_upload();   /* come ensure_cpu: prima le scritture in sospeso, poi i disegni */
++    flush_tex_batch(); flush_geometry();
++    VkBuffer buf; VkDeviceMemory mem; void *map;
++    if (!make_staging((VkDeviceSize)W * H * 4, &buf, &mem, &map)) return 0;
++    VkCommandBuffer cb = begin_oneshot();
++    vram_to(cb, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
++    VkBufferImageCopy rc = {0};
++    rc.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; rc.imageSubresource.layerCount = 1;
++    rc.imageOffset.x = x * S; rc.imageOffset.y = y * S;
++    rc.imageExtent.width = (uint32_t)W; rc.imageExtent.height = (uint32_t)H; rc.imageExtent.depth = 1;
++    p_vkCmdCopyImageToBuffer(cb, s_vram_img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, buf, 1, &rc);
++    end_oneshot(cb);
++    gpu_sync();   /* la copia deve essere finita prima di leggerla */
++    const uint8_t *p = (const uint8_t *)map;
++    for (int i = 0; i < W * H; i++, p += 4)
++        out[i] = 0xFF000000u | ((uint32_t)p[0] << 16) | ((uint32_t)p[1] << 8) | (uint32_t)p[2];
++    free_staging(buf, mem);
++    if (ow) *ow = W;
++    if (oh) *oh = H;
++    return W * H;
++}
++
+ /* ---- backend vtable ---------------------------------------------------- */
+ /* Also initialize the software renderer on the SAME VRAM array so a failed
+  * Vulkan context creation can fall back to software cleanly (mirrors how the GL
+@@ -3112,9 +3146,23 @@
+         wide_overlay_rect(y, h, c, semi);
+     }
+ }
+-/* 1px line as a thin quad along the segment. */
+-static void line_quad(int x0,int y0,int x1,int y1,const float ca[3],const float cb_[3]){
+-    float dx = (float)(x1 - x0), dy = (float)(y1 - y0);
++/* SM2-Recomp 0.12: PGXP sulle linee anche con Vulkan, come con OpenGL (gr_set_precise_line): le estremita' precise
++ * della prossima linea, in pixel nativi con la frazione; le consuma la linea successiva (vkb_draw_line,
++ * vkb_draw_shaded_line). */
++static int   s_sm2_pl_valid = 0;
++static float s_sm2_pl_x[2], s_sm2_pl_y[2];
++static uint64_t s_sm2_linee_vk = 0;   /* linee disegnate con le estremita' precise (comando pgxp) */
++uint64_t vk_renderer_sm2_precise_lines(void) { return s_sm2_linee_vk; }
++static void vkb_set_precise_line(int enabled, int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
++    s_sm2_pl_valid = enabled ? 1 : 0;
++    if (s_sm2_pl_valid) {
++        s_sm2_pl_x[0] = (float)x0 / 65536.0f;  s_sm2_pl_y[0] = (float)y0 / 65536.0f;
++        s_sm2_pl_x[1] = (float)x1 / 65536.0f;  s_sm2_pl_y[1] = (float)y1 / 65536.0f;
++    }
++}
++/* 1px line as a thin quad along the segment (SM2-Recomp: estremita' in float, anche con la frazione). */
++static void line_quad(float x0,float y0,float x1,float y1,const float ca[3],const float cb_[3]){
++    float dx = x1 - x0, dy = y1 - y0;
+     float len = dx*dx + dy*dy;
+     float nx = 0.5f, ny = 0.5f;
+     if (len > 0.0001f) { float il = 0.5f / (float)sqrt(len); nx = -dy * il; ny = dx * il; }
+@@ -3126,11 +3174,23 @@
+ }
+ static void vkb_draw_line(int x0,int y0,int x1,int y1,uint16_t c){
+     geo_prim_begin();
+-    float col[3]; col555(c, col); line_quad(x0,y0,x1,y1,col,col);
++    float col[3]; col555(c, col);
++    if (s_sm2_pl_valid) {   /* SM2-Recomp: PGXP sulle linee */
++        s_sm2_linee_vk++;
++        line_quad(s_sm2_pl_x[0], s_sm2_pl_y[0], s_sm2_pl_x[1], s_sm2_pl_y[1], col, col);
++    } else
++        line_quad((float)x0, (float)y0, (float)x1, (float)y1, col, col);
++    s_sm2_pl_valid = 0;
+ }
+ static void vkb_draw_shaded_line(int x0,int y0,uint16_t c0,int x1,int y1,uint16_t c1){
+     geo_prim_begin();
+-    float a[3],b[3]; col555(c0,a); col555(c1,b); line_quad(x0,y0,x1,y1,a,b);
++    float a[3],b[3]; col555(c0,a); col555(c1,b);
++    if (s_sm2_pl_valid) {   /* SM2-Recomp: PGXP sulle linee */
++        s_sm2_linee_vk++;
++        line_quad(s_sm2_pl_x[0], s_sm2_pl_y[0], s_sm2_pl_x[1], s_sm2_pl_y[1], a, b);
++    } else
++        line_quad((float)x0, (float)y0, (float)x1, (float)y1, a, b);
++    s_sm2_pl_valid = 0;
+ }
+ 
+ /* ---- textured primitives + VRAM->VRAM copy (Phase 3) ------------------- */
+@@ -3573,6 +3633,7 @@
+     .draw_textured_rect_scaled     = vkb_draw_textured_rect_scaled,
+     .draw_line                     = vkb_draw_line,
+     .draw_shaded_line              = vkb_draw_shaded_line,
++    .set_precise_line              = vkb_set_precise_line,   /* SM2-Recomp: PGXP sulle linee */
+     .render_display                = vkb_render_display,
+     .render_display_hires          = vkb_render_display_hires,
+     .vram_write                    = vkb_vram_write,

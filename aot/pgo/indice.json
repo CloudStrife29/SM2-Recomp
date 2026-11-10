@@ -1,0 +1,83 @@
+{
+ "formato": 1,
+ "profili": [
+  {
+   "profilo": "SLES-03623",
+   "variante": "",
+   "file": "SLES-03623.profdata.xz",
+   "sha256_profdata": "160915b193bc96e4e6d86989af0f743ee6df078c04c556da4f5fbbfd6185d28f",
+   "byte_profdata": 1561488,
+   "impronta_codice": "c222c802cdfba533be8db41fe4dd60caee518176c34b22112860348e6da8ade1",
+   "file_codice": 128,
+   "byte_codice": 299561949,
+   "launcher": "0.12-dev",
+   "da": "C:\\Progetti\\SM2-Recomp\\work\\v012\\pgo2_installazioni\\SLES-03623",
+   "data": "2026-11-04 23:41:05"
+  },
+  {
+   "profilo": "SLES-03623",
+   "variante": "pgxp",
+   "file": "SLES-03623-pgxp.profdata.xz",
+   "sha256_profdata": "ffc465e260d059ae5b3a81b017444274d75d592e4eadd5c20b28f409ea73eb9c",
+   "byte_profdata": 1572456,
+   "impronta_codice": "c222c802cdfba533be8db41fe4dd60caee518176c34b22112860348e6da8ade1",
+   "file_codice": 128,
+   "byte_codice": 299561949,
+   "launcher": "0.12-dev",
+   "da": "C:\\Progetti\\SM2-Recomp\\work\\pkb\\SM2-Recomp\\giochi_pgo_pgxp\\SLES-03623",
+   "data": "2026-11-06 13:03:06"
+  },
+  {
+   "profilo": "SLUS-01378",
+   "variante": "",
+   "file": "SLUS-01378.profdata.xz",
+   "sha256_profdata": "3fdf8b023c72c1d48343fb18da3ae1eb664afc53b74192ebf4015127162f9690",
+   "byte_profdata": 1526096,
+   "impronta_codice": "71e632f38411bcc4e4c726b680a68178e5a089734dfcad36a9e80edd5a5f4295",
+   "file_codice": 128,
+   "byte_codice": 299476415,
+   "launcher": "0.12-dev",
+   "da": "C:\\Progetti\\SM2-Recomp\\work\\v012\\pgo2_installazioni\\SLUS-01378",
+   "data": "2026-11-04 23:32:09"
+  },
+  {
+   "profilo": "SLUS-01378",
+   "variante": "pgxp",
+   "file": "SLUS-01378-pgxp.profdata.xz",
+   "sha256_profdata": "15ccacc777b105ff4fe0c13bdaf30f2fb45455b9909d2f6f9a0060625320f325",
+   "byte_profdata": 1549032,
+   "impronta_codice": "71e632f38411bcc4e4c726b680a68178e5a089734dfcad36a9e80edd5a5f4295",
+   "file_codice": 128,
+   "byte_codice": 299476415,
+   "launcher": "0.12-dev",
+   "da": "C:\\Progetti\\SM2-Recomp\\work\\pkb\\SM2-Recomp\\giochi_pgo_pgxp\\SLUS-01378",
+   "data": "2026-11-06 12:54:40"
+  },
+  {
+   "profilo": "SLUS-01378-Rev1",
+   "variante": "",
+   "file": "SLUS-01378-Rev1.profdata.xz",
+   "sha256_profdata": "3beb19acffaffff7b7149d71ccda156542b94add29873a2c685e112bab432fe8",
+   "byte_profdata": 1527896,
+   "impronta_codice": "c2dd12baf278415381f4165150952332754c592ba3a21737b9b83a2eec951bba",
+   "file_codice": 128,
+   "byte_codice": 299491667,
+   "launcher": "0.11",
+   "da": "C:\\Progetti\\SM2-Recomp\\work\\v012\\t4\\SLUS-01378-Rev1",
+   "data": "2026-11-04 20:32:53"
+  },
+  {
+   "profilo": "SLUS-01378-Rev1",
+   "variante": "pgxp",
+   "file": "SLUS-01378-Rev1-pgxp.profdata.xz",
+   "sha256_profdata": "a7f6769f3f5fd613ac2fc6f17e590b468bbb570568c29e4b5327d66ec0f8d368",
+   "byte_profdata": 1551408,
+   "impronta_codice": "c2dd12baf278415381f4165150952332754c592ba3a21737b9b83a2eec951bba",
+   "file_codice": 128,
+   "byte_codice": 299491667,
+   "launcher": "0.12-dev",
+   "da": "C:\\Progetti\\SM2-Recomp\\work\\pkb\\SM2-Recomp\\giochi_pgo_pgxp\\SLUS-01378-Rev1",
+   "data": "2026-11-06 12:46:21"
+  }
+ ]
+}

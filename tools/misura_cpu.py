@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""SM2-Recomp - quanta CPU consuma l'eseguibile normale (quello senza server di debug) a velocita' normale.
+"""EnterElectro-Recomp - quanta CPU consuma l'eseguibile normale (quello senza server di debug) a velocita' normale.
 
-English: SM2-Recomp - how much CPU the game executable (build-release, without the debug server) uses at normal
+English: EnterElectro-Recomp - how much CPU the game executable (build-release, without the debug server) uses at normal
 speed: it runs the game with the window hidden and dummy audio, without input, for --secondi seconds and reads the
 CPU time of the process (GetProcessTimes). Less CPU for the same work = a more efficient executable. The comments are
 in Italian.
@@ -134,7 +134,7 @@ def main() -> int:
                 (f' | {" | ".join(righe_idle)}' if righe_idle else ''))
             (out / 'cpu.json').write_text(json.dumps(ris, indent=1), encoding='utf-8')
             time.sleep(3)
-    righe = [f'SM2-Recomp - CPU dell\'eseguibile normale ({args.profile}), {datetime.datetime.now():%Y-%m-%d %H:%M}',
+    righe = [f'EnterElectro-Recomp - CPU dell\'eseguibile normale ({args.profile}), {datetime.datetime.now():%Y-%m-%d %H:%M}',
              f'{args.secondi} s a velocita\' normale, finestra nascosta, senza tasti (avvio, filmati, titolo):', '']
     base = None
     for e in etichette:

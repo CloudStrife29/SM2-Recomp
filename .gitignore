@@ -23,3 +23,6 @@ tools/ia/
 # strumenti di compilazione (nel pacchetto) / build tools (in the package)
 tools/toolchain/
 __pycache__/
+# collegamento che il launcher crea nella cartella / shortcut the launcher creates in the folder
+/EnterElectro-Recomp.lnk
+/SM2-Recomp.lnk

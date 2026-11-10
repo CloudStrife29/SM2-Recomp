@@ -1,0 +1,691 @@
+/* video_enhancement_settings_test — [video] enhancement plumbing.
+ *
+ * geometry_correction / perspective_texturing are the opt-in for the sub-pixel
+ * vertex precision and perspective-correct UV enhancements (psxrecomp issue
+ * #92). The underlying GTE/GPU machinery has its own unit coverage in the
+ * runtime suite; what this test pins is the part that decides whether it is
+ * ever switched on:
+ *
+ *   1. both default OFF (the faithful floor) when game.toml says nothing;
+ *   2. game.toml [video] turns them on -- the title's baseline;
+ *   3. settings.toml no longer carries them, nor any other look the built-in
+ *      mods own (CRT Filter, Image Filtering, PGXP Precision, Internal
+ *      Resolution), nor the audio sample rate: old keys are ignored, not
+ *      errors, and a save drops them;
+ *   4. game.toml internal_resolution "auto" (dynamic resolution), the title's
+ *      baseline the Internal Resolution mod resolves over;
+ *   5. a game.toml with the retired [quality.*] presets fails to load.
+ */
+#include "config_loader.h"
+#include "../../runtime/include/internal_resolution.h"
+
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <string>
+
+namespace fs = std::filesystem;
+
+static int failures = 0;
+
+static void check(bool cond, const char* what) {
+    if (!cond) {
+        std::fprintf(stderr, "FAIL: %s\n", what);
+        ++failures;
+    }
+}
+
+static fs::path write_temp(const std::string& name, const std::string& body) {
+    fs::path p = fs::temp_directory_path() / name;
+    std::ofstream f(p, std::ios::binary | std::ios::trunc);
+    f << body;
+    return p;
+}
+
+/* game.toml needs the fields load_game_config() requires; keep this to the
+ * documented minimum plus whichever [video] body the case under test needs.
+ *
+ * [runtime] is required even when empty: parse_runtime_block() early-returns
+ * on a config with no [runtime] table, so a game.toml carrying [video] alone
+ * would silently ignore every video key. Every shipped game.toml has both. */
+static fs::path write_game_toml(const std::string& name,
+                                const std::string& video_block) {
+    return write_temp(name,
+        "[game]\n"
+        "name = \"probe\"\n"
+        "exe = \"probe.exe\"\n"
+        "load_address = \"0x80010000\"\n"
+        "entry_pc = \"0x80010000\"\n"
+        "text_size = \"0x1000\"\n"
+        "[recompiler]\n"
+        "seeds = \"seeds.json\"\n"
+        "[runtime]\n"
+        + video_block);
+}
+
+/* BOTH default off — the faithful floor — but for different reasons, and the
+ * distinction matters if anyone reconsiders these later. geometry_correction is
+ * off because it is BROKEN at the coverage the runtime can reach (it moves
+ * vertices and splits shared edges) and has no launcher control at all.
+ * perspective_texturing is off because it is a deliberate departure from hardware
+ * output validated on only one title and renderer; it is structurally safe and
+ * players opt in from the launcher. See docs/ENHANCEMENTS.md G1.8/G1.9. */
+static void test_defaults_off() {
+    fs::path p = write_game_toml("psxrecomp_pgxp_default.toml", "");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(!gc.runtime.video_geometry_correction,
+          "geometry_correction defaults OFF (known to crack meshes)");
+    check(!gc.runtime.video_perspective_texturing,
+          "perspective_texturing defaults OFF (faithful floor; opt-in)");
+    check(!gc.runtime.video_pgxp_tolerance_set &&
+          !gc.runtime.video_pgxp_position_fallback_set,
+          "absent PGXP tuning delegates defaults to the runtime flavor");
+    fs::remove(p);
+}
+
+static void test_game_toml_opt_in() {
+    fs::path p = write_game_toml("psxrecomp_pgxp_on.toml",
+        "[video]\n"
+        "window_width = 1920\n"
+        "geometry_correction = true\n"
+        "perspective_texturing = true\n");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_window_width == 1920,
+          "[video] window_width is honoured");
+    check(gc.runtime.video_geometry_correction,
+          "[video] geometry_correction = true is honoured");
+    check(gc.runtime.video_perspective_texturing,
+          "[video] perspective_texturing = true is honoured");
+    fs::remove(p);
+}
+
+static void test_game_window_width_validation() {
+    fs::path p = write_game_toml("psxrecomp_window_too_small.toml",
+        "[video]\n"
+        "window_width = 639\n");
+    bool rejected = false;
+    try {
+        (void)PSXRecompV4::load_game_config(p);
+    } catch (const std::exception&) {
+        rejected = true;
+    }
+    check(rejected, "[video] window_width rejects values below 640");
+    fs::remove(p);
+}
+
+/* The two knobs are independent: a title may want stable geometry without
+ * changing texture mapping (or the reverse) — so a single flag would be wrong. */
+static void test_knobs_independent() {
+    /* Each knob must be settable against the other's default: geometry ON while
+     * perspective is explicitly opted OUT proves neither key implies the other. */
+    fs::path p = write_game_toml("psxrecomp_pgxp_geom_only.toml",
+        "[video]\n"
+        "geometry_correction = true\n"
+        "perspective_texturing = false\n");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_geometry_correction,
+          "geometry_correction turns on independently");
+    check(!gc.runtime.video_perspective_texturing,
+          "perspective_texturing can be opted OUT while geometry is on");
+    fs::remove(p);
+
+    /* And the converse direction: perspective_texturing alone must turn on
+     * WITHOUT dragging the broken geometry knob on with it. This is the case that
+     * matters most in practice — it is what the launcher checkbox does. */
+    fs::path q = write_game_toml("psxrecomp_pgxp_persp_only.toml",
+        "[video]\n"
+        "perspective_texturing = true\n");
+    auto gq = PSXRecompV4::load_game_config(q);
+    check(gq.runtime.video_perspective_texturing,
+          "perspective_texturing alone turns on");
+    check(!gq.runtime.video_geometry_correction,
+          "perspective_texturing does NOT drag geometry_correction on with it");
+    fs::remove(q);
+}
+
+static std::string read_text(const fs::path& p) {
+    std::ifstream f(p);   // closed on return: Windows cannot delete an open file
+    return std::string(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+}
+
+/* The look the built-in mods own is not a settings.toml key any more. A file
+ * from before that change still loads -- its old keys are ignored, never an
+ * error that would throw away the player's other settings -- and the next
+ * save drops them, so they cannot come back as a hidden override. */
+static void test_retired_player_look_keys() {
+    fs::path p = write_temp("psxrecomp_retired_look.toml",
+        "[video]\n"
+        "renderer = \"opengl\"\n"
+        "antialiasing = false\n"
+        "texture_filtering = \"bilinear\"\n"
+        "fmv_filter = \"bicubic\"\n"
+        "crt_filter = \"crt\"\n"
+        "scanlines = true\n"
+        "scanline_strength = 0.3\n"
+        "geometry_correction = true\n"
+        "perspective_texturing = true\n"
+        "quality_preset = \"high\"\n"
+        "quality_base = \"high\"\n"
+        "quality_hardware = \"abc\"\n"
+        "quality_detected = \"ultra\"\n"
+        "rewind = true\n"
+        "rewind_depth = 100\n"
+        "rewind_interval = 4\n"
+        "dynamic_resolution = true\n"
+        "dynamic_resolution_min = \"1080p\"\n"
+        "supersampling = 2\n"
+        "internal_resolution = \"4k\"\n"
+        "supersample = 1.5\n"
+        "window_width = 1600\n"
+        "[audio]\n"
+        "frequency = 48000\n"
+        "spu_hq = true\n");
+    auto us = PSXRecompV4::load_user_settings(p);
+    check(!us.parse_error, "a settings.toml with retired keys still parses");
+    check(us.has_renderer && us.renderer == 1, "the player's other video settings survive");
+    check(us.has_window_width && us.window_width == 1600, "the player's window size survives");
+    fs::remove(p);
+
+    fs::path out = fs::temp_directory_path() / "psxrecomp_retired_look_saved.toml";
+    check(PSXRecompV4::save_user_settings(out, us), "save_user_settings writes");
+    const std::string text = read_text(out);
+    for (const char* key : {"antialiasing", "texture_filtering", "fmv_filter", "crt_filter",
+                            "scanlines", "scanline_strength", "geometry_correction",
+                            "perspective_texturing", "quality_", "rewind =", "rewind_depth",
+                            "rewind_interval", "spu_hq", "dynamic_resolution",
+                            "supersampling", "internal_resolution", "supersample",
+                            "frequency", "[audio]"})
+        check(text.find(key) == std::string::npos,
+              (std::string("a save drops the retired key ") + key).c_str());
+    check(text.find("renderer") != std::string::npos &&
+          text.find("window_width      = 1600") != std::string::npos, "a save keeps the rest");
+    fs::remove(out);
+}
+
+/* Internal resolution "auto" is Match display with dynamic resolution on. A
+ * title can ship it as its baseline (the player chooses it through the
+ * Internal Resolution mod); a dynamic-resolution floor never is. */
+static void test_internal_resolution_auto() {
+    fs::path p = write_game_toml("psxrecomp_ir_auto.toml",
+        "[video]\n"
+        "internal_resolution = \"auto\"\n");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_internal_resolution == -2,
+          "game.toml internal_resolution = \"auto\" parses (PSX_IR_AUTO)");
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_dynres_min_auto.toml",
+        "[video]\n"
+        "dynamic_resolution_min = \"auto\"\n");
+    bool rejected = false;
+    try { (void)PSXRecompV4::load_game_config(p); } catch (const std::exception&) { rejected = true; }
+    check(rejected, "dynamic_resolution_min is a fixed floor, never \"auto\"");
+    fs::remove(p);
+}
+
+/* Graphics presets were removed. A title that still carries [quality.*]
+ * learns so at load instead of shipping presets nothing applies. */
+static void test_quality_presets_rejected() {
+    fs::path p = write_game_toml("psxrecomp_quality_retired.toml",
+        "[video]\n"
+        "supersample = 1.5\n"
+        "[quality.low]\n"
+        "supersample = 1.0\n");
+    bool rejected = false;
+    std::string why;
+    try { (void)PSXRecompV4::load_game_config(p); }
+    catch (const std::exception& e) { rejected = true; why = e.what(); }
+    check(rejected, "a game.toml with [quality.*] fails to load");
+    check(why.find("[quality") != std::string::npos, "the error names the [quality] table");
+    fs::remove(p);
+}
+
+/* settings.toml [video] fov_scale: int and float TOML values read, absent stays
+ * absent, and a launcher save round-trips it (range checking is the runtime's). */
+static void test_user_settings_fov_scale() {
+    fs::path p = write_temp("psxrecomp_fov_settings.toml", "[video]\nfov_scale = 2\n");
+    auto us = PSXRecompV4::load_user_settings(p);
+    check(us.has_fov_scale && us.fov_scale == 2.0, "settings.toml integer fov_scale read");
+    fs::remove(p);
+    p = write_temp("psxrecomp_fov_settings_f.toml", "[video]\nfov_scale = 1.5\n");
+    us = PSXRecompV4::load_user_settings(p);
+    check(us.has_fov_scale && us.fov_scale == 1.5, "settings.toml float fov_scale read");
+    fs::remove(p);
+    p = write_temp("psxrecomp_fov_settings_s.toml", "[video]\nfov_scale = \"wide\"\n");
+    us = PSXRecompV4::load_user_settings(p);
+    check(!us.has_fov_scale, "non-numeric fov_scale leaves has_fov_scale false");
+    fs::remove(p);
+    PSXRecompV4::UserSettings out;
+    out.fov_scale = 1.25; out.has_fov_scale = true;
+    p = fs::temp_directory_path() / "psxrecomp_fov_roundtrip.toml";
+    check(PSXRecompV4::save_user_settings(p, out), "save_user_settings writes fov_scale");
+    auto back = PSXRecompV4::load_user_settings(p);
+    check(back.has_fov_scale && back.fov_scale == 1.25, "fov_scale survives a save/load round trip");
+    fs::remove(p);
+}
+
+/* The title baseline accepts fixed scales and retained height presets.
+ * The shared mod chooses the fresh-profile default later, at session setup. */
+static void test_internal_resolution_game_toml() {
+    fs::path p = write_game_toml("psxrecomp_ir_default.toml", "");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_internal_resolution == 0,
+          "internal_resolution defaults unset (supersampling stands)");
+    check(gc.runtime.video_resolution_reference_lines == 240,
+          "resolution_reference_lines defaults to 240");
+    check(gc.runtime.video_match_display_max_lines == 0,
+          "match_display_max_lines defaults to 0 (no cap)");
+    check(gc.runtime.video_supersample_disable_at_lines == 0, "display SS policy defaults off");
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_ir_match_cap.toml",
+        "[video]\n"
+        "internal_resolution = \"display\"\n"
+        "match_display_max_lines = 2160\n"
+        "supersample_disable_at_lines = 2160\n");
+    gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_match_display_max_lines == 2160, "match_display_max_lines parses");
+    check(gc.runtime.video_supersample_disable_at_lines == 2160, "display SS policy parses");
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_ir_4k.toml",
+        "[video]\n"
+        "internal_resolution = \"4K\"\n"
+        "resolution_reference_lines = 240\n"
+        "supersampling = 12\n");
+    gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_internal_resolution == 2160, "game.toml \"4K\" parses (case-insensitive)");
+    check(gc.runtime.video_supersampling == 12, "supersampling accepts 12 (1..32)");
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_ir_fixed.toml",
+        "[video]\n"
+        "internal_resolution = \"32x\"\n"
+        "dynamic_resolution_min = \"4x\"\n"
+        "resolution_reference_lines = 480\n"
+        "supersampling = 12\n");
+    gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_internal_resolution == PSX_IR_SCALE(32), "game.toml 32x parses");
+    check(gc.runtime.video_dynamic_resolution_min == PSX_IR_SCALE(4), "game.toml fixed 4x floor parses");
+    check(psx_resolve_internal_scale(gc.runtime.video_internal_resolution,
+              gc.runtime.video_resolution_reference_lines, 0, 32) == 32,
+          "fixed scale keeps its factor with a 480-line title reference");
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_ir_lines.toml",
+        "[video]\n"
+        "internal_resolution = 1600\n");
+    gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_internal_resolution == 1600, "game.toml integer lines parse");
+    fs::remove(p);
+
+    for (const char* bad : { "internal_resolution = \"9k\"\n",
+                             "internal_resolution = \"33x\"\n",
+                             "internal_resolution = 1\n",
+                             "resolution_reference_lines = 50\n",
+                             "match_display_max_lines = 100\n",
+                             "supersample_disable_at_lines = 100\n",
+                             "supersampling = 33\n" }) {
+        p = write_game_toml("psxrecomp_ir_bad.toml", std::string("[video]\n") + bad);
+        bool rejected = false;
+        try { (void)PSXRecompV4::load_game_config(p); } catch (const std::exception&) { rejected = true; }
+        check(rejected, bad);
+        fs::remove(p);
+    }
+}
+
+/* window_width is still a player setting, up to an 8K-wide window. */
+static void test_window_width_settings() {
+    fs::path p = write_temp("psxrecomp_window_width.toml",
+        "[video]\n"
+        "window_width = 7680\n");
+    auto us = PSXRecompV4::load_user_settings(p);
+    check(us.has_window_width && us.window_width == 7680,
+          "settings.toml window_width accepts 7680 (was capped at 3840)");
+    fs::remove(p);
+}
+
+/* [video] texture_window_batching: a game.toml-only OpenGL batching opt-in
+ * (the image is unchanged; see gpu_gl_renderer.c s_twin_batching). Off unless
+ * the game asks for it. */
+static void test_texture_window_batching() {
+    fs::path p = write_game_toml("psxrecomp_twin_default.toml", "");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(!gc.runtime.video_texture_window_batching,
+          "texture_window_batching defaults OFF");
+    fs::remove(p);
+    fs::path q = write_game_toml("psxrecomp_twin_on.toml",
+        "[video]\n"
+        "texture_window_batching = true\n");
+    auto gq = PSXRecompV4::load_game_config(q);
+    check(gq.runtime.video_texture_window_batching,
+          "[video] texture_window_batching = true is honoured");
+    fs::remove(q);
+}
+
+/* settings.toml [video] render_thread / present_thread / frame_generation:
+ * the player's override of the game.toml default. Absent keys stay unset (so
+ * the title default stands), present keys parse, and a launcher save writes
+ * back exactly what was set -- including an explicit false. */
+static void test_pipeline_user_settings() {
+    fs::path p = write_temp("psxrecomp_pipe_absent.toml", "[video]\n");
+    auto a = PSXRecompV4::load_user_settings(p);
+    check(!a.has_render_thread && !a.has_present_thread && !a.has_frame_generation,
+          "pipeline keys absent => unset (game.toml default stands)");
+    fs::remove(p);
+
+    p = write_temp("psxrecomp_pipe_read.toml",
+        "[video]\n"
+        "render_thread = true\n"
+        "present_thread = false\n"
+        "frame_generation = true\n");
+    auto u = PSXRecompV4::load_user_settings(p);
+    check(u.has_render_thread && u.render_thread, "settings render_thread = true parses");
+    check(u.has_present_thread && !u.present_thread, "settings present_thread = false parses");
+    check(u.has_frame_generation && u.frame_generation, "settings frame_generation = true parses");
+    fs::remove(p);
+
+    PSXRecompV4::UserSettings out;
+    out.has_render_thread = true;    out.render_thread = false;
+    out.has_present_thread = true;   out.present_thread = true;
+    out.has_frame_generation = true; out.frame_generation = true;
+    p = fs::temp_directory_path() / "psxrecomp_pipe_rt.toml";
+    check(PSXRecompV4::save_user_settings(p, out), "save_user_settings writes pipeline keys");
+    auto back = PSXRecompV4::load_user_settings(p);
+    check(back.has_render_thread && !back.render_thread, "render_thread = false round-trips");
+    check(back.has_present_thread && back.present_thread, "present_thread round-trips");
+    check(back.has_frame_generation && back.frame_generation, "frame_generation round-trips");
+    fs::remove(p);
+
+    /* [video] vsync: every mode parses from settings.toml and a launcher
+     * save writes back the same mode (vrr = 2 included). */
+    const struct { const char *text; int value; } vs[] = {
+        { "on", 1 }, { "immediate", 0 }, { "adaptive", -1 }, { "vrr", 2 } };
+    for (const auto &m : vs) {
+        p = write_temp("psxrecomp_vsync_read.toml",
+                       std::string("[video]\nvsync = \"") + m.text + "\"\n");
+        auto vr = PSXRecompV4::load_user_settings(p);
+        check(vr.has_vsync && vr.vsync == m.value, "settings vsync parses every mode");
+        fs::remove(p);
+        PSXRecompV4::UserSettings vo;
+        vo.has_vsync = true; vo.vsync = m.value;
+        p = fs::temp_directory_path() / "psxrecomp_vsync_rt.toml";
+        check(PSXRecompV4::save_user_settings(p, vo), "save_user_settings writes vsync");
+        auto vb = PSXRecompV4::load_user_settings(p);
+        check(vb.has_vsync && vb.vsync == m.value, "settings vsync round-trips every mode");
+        fs::remove(p);
+    }
+
+    PSXRecompV4::UserSettings none;
+    p = fs::temp_directory_path() / "psxrecomp_pipe_none.toml";
+    check(PSXRecompV4::save_user_settings(p, none), "save_user_settings writes defaults");
+    auto nb = PSXRecompV4::load_user_settings(p);
+    check(!nb.has_render_thread && !nb.has_present_thread && !nb.has_frame_generation,
+          "unset pipeline keys are not written");
+    fs::remove(p);
+}
+
+/* [video] render_thread (docs/RENDER_THREAD.md): opt-in, off by default so
+ * every title keeps the synchronous OpenGL path unless it asks. */
+static void test_render_thread() {
+    fs::path p = write_game_toml("psxrecomp_rth_default.toml", "");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(!gc.runtime.video_render_thread, "render_thread defaults OFF");
+    fs::remove(p);
+    fs::path q = write_game_toml("psxrecomp_rth_on.toml",
+        "[video]\n"
+        "render_thread = true\n");
+    auto gq = PSXRecompV4::load_game_config(q);
+    check(gq.runtime.video_render_thread, "[video] render_thread = true is honoured");
+    fs::remove(q);
+}
+
+/* [video] present_thread (docs/RENDER_THREAD.md): opt-in, off by default. */
+static void test_present_thread() {
+    fs::path p = write_game_toml("psxrecomp_pt_default.toml", "");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(!gc.runtime.video_present_thread, "present_thread defaults OFF");
+    fs::remove(p);
+    fs::path q = write_game_toml("psxrecomp_pt_on.toml",
+        "[video]\n"
+        "render_thread = true\n"
+        "present_thread = true\n");
+    auto gq = PSXRecompV4::load_game_config(q);
+    check(gq.runtime.video_present_thread, "[video] present_thread = true is honoured");
+    fs::remove(q);
+}
+
+/* [video] frame_generation (docs/FRAME_GENERATION.md): opt-in, off by default. */
+static void test_frame_generation() {
+    fs::path p = write_game_toml("psxrecomp_fg_default.toml", "");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(!gc.runtime.video_frame_generation, "frame_generation defaults OFF");
+    fs::remove(p);
+    fs::path q = write_game_toml("psxrecomp_fg_on.toml",
+        "[video]\n"
+        "render_thread = true\n"
+        "frame_generation = true\n");
+    auto gq = PSXRecompV4::load_game_config(q);
+    check(gq.runtime.video_frame_generation, "[video] frame_generation = true is honoured");
+    fs::remove(q);
+}
+
+/* PGXP title tuning retains base values here; presence flags distinguish
+ * explicit title overrides from the runtime's hook-flavor defaults. */
+static void test_pgxp_title_keys() {
+    fs::path p = write_game_toml("psxrecomp_pgxp_keys_default.toml", "");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_pgxp_tolerance == 0.5,
+          "pgxp_tolerance retains the base-build value before runtime resolution");
+    check(gc.runtime.video_pgxp_position_fallback,
+          "pgxp_position_fallback retains the base value before runtime resolution");
+    check(!gc.runtime.video_pgxp_preserve_projection,
+          "pgxp_preserve_projection defaults OFF (unchanged behaviour)");
+    check(!gc.runtime.video_pgxp_mod_only,
+          "pgxp_mod_only defaults OFF (unchanged behaviour)");
+    check(!gc.runtime.video_pgxp_depth_buffer && !gc.runtime.video_pgxp_color_correction &&
+          gc.runtime.video_pgxp_seam == 0 && gc.runtime.video_pgxp_depth_threshold == 4096.0,
+          "PGXP renderer features default OFF (G1.14)");
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_pgxp_render_keys.toml",
+        "[video]\n"
+        "pgxp_depth_buffer = true\n"
+        "pgxp_color_correction = true\n"
+        "pgxp_seam = \"wide\"\n"
+        "pgxp_depth_threshold = 2048.0\n");
+    gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_pgxp_depth_buffer && gc.runtime.video_pgxp_color_correction &&
+          gc.runtime.video_pgxp_seam == 2 && gc.runtime.video_pgxp_depth_threshold == 2048.0,
+          "PGXP renderer keys are honoured");
+    fs::remove(p);
+
+    /* Integer literals for number keys (Crash sets the threshold to 0). */
+    p = write_game_toml("psxrecomp_pgxp_render_int.toml",
+        "[video]\n"
+        "pgxp_depth_threshold = 0\n"
+        "pgxp_tolerance = 1\n"
+        "scanline_strength = 1\n");
+    gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_pgxp_depth_threshold == 0.0 && gc.runtime.video_pgxp_tolerance == 1.0 &&
+          gc.runtime.video_pgxp_tolerance_set && !gc.runtime.video_pgxp_position_fallback_set,
+          "explicit tolerance alone leaves fallback on its automatic default");
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_pgxp_render_bad.toml",
+        "[video]\n"
+        "pgxp_seam = \"huge\"\n");
+    {
+        bool bad = false;
+        try { (void)PSXRecompV4::load_game_config(p); } catch (const std::exception&) { bad = true; }
+        check(bad, "pgxp_seam must be off, fine or wide");
+    }
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_pgxp_keys_dataflow.toml",
+        "[video]\n"
+        "pgxp_tolerance = -1.0\n"
+        "pgxp_position_fallback = false\n"
+        "pgxp_preserve_projection = true\n"
+        "pgxp_mod_only = true\n");
+    gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.video_pgxp_mod_only, "pgxp_mod_only = true is honoured");
+    check(gc.runtime.video_pgxp_tolerance < 0.0 &&
+          gc.runtime.video_pgxp_tolerance_set &&
+          gc.runtime.video_pgxp_position_fallback_set,
+          "explicit PGXP tuning is marked as an override");
+    check(!gc.runtime.video_pgxp_position_fallback,
+          "pgxp_position_fallback = false is honoured");
+    check(gc.runtime.video_pgxp_preserve_projection,
+          "pgxp_preserve_projection = true is honoured");
+    check(!gc.runtime.video_geometry_correction &&
+          !gc.runtime.video_perspective_texturing,
+          "the tuning keys do not turn PGXP on by themselves");
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_pgxp_keys_bad.toml",
+        "[video]\n"
+        "pgxp_preserve_projection = 1\n");
+    bool rejected = false;
+    try { (void)PSXRecompV4::load_game_config(p); } catch (const std::exception&) { rejected = true; }
+    check(rejected, "pgxp_preserve_projection must be a boolean");
+    fs::remove(p);
+
+    p = write_game_toml("psxrecomp_pgxp_keys_bad_mod_only.toml",
+        "[video]\n"
+        "pgxp_mod_only = \"yes\"\n");
+    rejected = false;
+    try { (void)PSXRecompV4::load_game_config(p); } catch (const std::exception&) { rejected = true; }
+    check(rejected, "pgxp_mod_only must be a boolean");
+    fs::remove(p);
+}
+
+/* [timing] guest_cycle_scale and its declarative RAM gate (title constants). */
+static void test_timing_gate() {
+    fs::path p = write_game_toml("ves_timing_none.toml", "");
+    auto gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.guest_cycle_scale == 1, "timing: default scale 1");
+    check(gc.runtime.guest_cycle_scale_gate.empty(), "timing: no gate by default");
+    check(!gc.runtime.guest_cycle_scale_gated, "timing: mod gate off by default");
+    fs::remove(p);
+
+    p = write_game_toml("ves_timing_one.toml",
+        "[timing]\nguest_cycle_scale = 64\n"
+        "guest_cycle_scale_gate = { addr = 0x800AC794, value = 0x180 }\n");
+    gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.guest_cycle_scale == 64, "timing: scale 64");
+    check(gc.runtime.guest_cycle_scale_gate.size() == 1 &&
+          gc.runtime.guest_cycle_scale_gate[0].addr == 0x800AC794u &&
+          gc.runtime.guest_cycle_scale_gate[0].value == 0x180u &&
+          gc.runtime.guest_cycle_scale_gate[0].size == 4u &&
+          gc.runtime.guest_cycle_scale_gate[0].mask == 0xFFFFFFFFu,
+          "timing: single inline-table gate with defaults");
+    fs::remove(p);
+
+    p = write_game_toml("ves_timing_arr.toml",
+        "[timing]\nguest_cycle_scale = 8\nguest_cycle_scale_gated = true\n"
+        "guest_cycle_scale_gate = [ { addr = 0x800AC794, value = 0x180 },\n"
+        "  { addr = 0x00010003, size = 1, mask = 0x0F, value = 5 } ]\n");
+    gc = PSXRecompV4::load_game_config(p);
+    check(gc.runtime.guest_cycle_scale_gate.size() == 2 &&
+          gc.runtime.guest_cycle_scale_gate[1].size == 1u &&
+          gc.runtime.guest_cycle_scale_gate[1].mask == 0x0Fu &&
+          gc.runtime.guest_cycle_scale_gated, "timing: gate array + mod gate");
+    fs::remove(p);
+
+    p = write_game_toml("ves_timing_bad.toml",
+        "[timing]\nguest_cycle_scale_gate = { addr = 0x1F801070, value = 1 }\n");
+    bool rejected = false;
+    try { (void)PSXRecompV4::load_game_config(p); } catch (const std::exception&) { rejected = true; }
+    check(rejected, "timing: non-RAM gate address rejected");
+    fs::remove(p);
+
+    /* Oversized and negative values must be rejected, not wrapped to 32 bits. */
+    const struct { const char* body; const char* what; } bad[] = {
+        { "guest_cycle_scale_gate = { addr = 0x100010000, value = 1 }", "oversized addr" },
+        { "guest_cycle_scale_gate = { addr = -4, value = 1 }", "negative addr" },
+        { "guest_cycle_scale_gate = { addr = 0x80010000, value = 0x100000001 }", "oversized value" },
+        { "guest_cycle_scale_gate = { addr = 0x80010000, value = -1 }", "negative value" },
+        { "guest_cycle_scale_gate = { addr = 0x80010000, value = 1, size = 0x100000004 }", "oversized size" },
+        { "guest_cycle_scale_gate = { addr = 0x80010000, value = 1, size = -4 }", "negative size" },
+        { "guest_cycle_scale_gate = { addr = 0x80010000, value = 1, mask = 0x1FFFFFFFF }", "oversized mask" },
+        { "guest_cycle_scale_gate = { addr = 0x80010000, value = 1, mask = -1 }", "negative mask" },
+        { "guest_cycle_scale = 0", "scale 0" },
+        { "guest_cycle_scale = 65", "scale 65" },
+        { "guest_cycle_scale = -8", "negative scale" },
+        { "guest_cycle_scale = 0x100000008", "oversized scale" },
+    };
+    for (const auto& b : bad) {
+        p = write_game_toml("ves_timing_range.toml", std::string("[timing]\n") + b.body + "\n");
+        rejected = false;
+        try { (void)PSXRecompV4::load_game_config(p); } catch (const std::exception&) { rejected = true; }
+        check(rejected, (std::string("timing: rejected ") + b.what).c_str());
+        fs::remove(p);
+    }
+}
+
+static void test_fractional_fast_forward() {
+    for (int tenth = 10; tenth <= 50; ++tenth) {
+        PSXRecompV4::UserSettings saved;
+        saved.has_fast_forward_speed = true;
+        saved.fast_forward_speed = tenth / 10.0;
+        saved.has_fast_forward_mode = true;
+        saved.fast_forward_toggle_mode = (tenth % 2) != 0;
+        auto p = fs::temp_directory_path() / "ves_ff_roundtrip.toml";
+        PSXRecompV4::save_user_settings(p, saved);
+        auto loaded = PSXRecompV4::load_user_settings(p);
+        check(loaded.has_fast_forward_speed && loaded.fast_forward_speed == saved.fast_forward_speed,
+              "all fractional FF speeds survive save/reload (including integer TOML)");
+        check(loaded.has_fast_forward_mode && loaded.fast_forward_toggle_mode == saved.fast_forward_toggle_mode,
+              "FF hold/toggle survives save/reload");
+        fs::remove(p);
+    }
+    for (const char* invalid : {"nan", "inf", "0.9", "5.1", "\"2x\""}) {
+        auto p = write_temp("ves_ff_bad.toml", std::string("[hotkeys]\nfast_forward_speed = ") + invalid + "\nfast_forward_mode = \"broken\"\n");
+        auto loaded = PSXRecompV4::load_user_settings(p);
+        check(!loaded.has_fast_forward_speed && !loaded.has_fast_forward_mode,
+              "invalid FF settings do not override defaults");
+        fs::remove(p);
+    }
+}
+
+int main() {
+    {
+        auto p = write_game_toml("ves_player_pipeline.toml", "[video]\noffer_render_pipeline = false\n");
+        check(!PSXRecompV4::load_game_config(p).runtime.video_offer_render_pipeline,
+              "title can hide unqualified render-pipeline controls");
+        fs::remove(p);
+        p = write_game_toml("ves_player_pipeline_default.toml", "");
+        check(PSXRecompV4::load_game_config(p).runtime.video_offer_render_pipeline,
+              "legacy titles retain render-pipeline controls");
+        fs::remove(p);
+    }
+    test_fractional_fast_forward();
+    test_internal_resolution_game_toml();
+    test_window_width_settings();
+    test_defaults_off();
+    test_game_toml_opt_in();
+    test_game_window_width_validation();
+    test_knobs_independent();
+    test_retired_player_look_keys();
+    test_internal_resolution_auto();
+    test_quality_presets_rejected();
+    test_user_settings_fov_scale();
+    test_texture_window_batching();
+    test_render_thread();
+    test_frame_generation();
+    test_present_thread();
+    test_pipeline_user_settings();
+    test_pgxp_title_keys();
+    test_timing_gate();
+
+    if (failures) {
+        std::fprintf(stderr, "video_enhancement_settings_test: %d failure(s)\n",
+                     failures);
+        return 1;
+    }
+    std::printf("PASS: [video] enhancement plumbing (title baseline, retired "
+                "player keys, Internal resolution Auto)\n");
+    return 0;
+}

@@ -1,2 +1,5 @@
+# Tutti i file restano byte per byte come nel pacchetto, su ogni PC (niente conversione dei fine riga).
+# Every file stays byte for byte as in the package, on every PC (no line-ending conversion).
+* -text
 *.cmd -text
 *.bat -text

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""SM2-Recomp - launcher (prototipo, 27/10/2026): dal disco dell'utente al gioco per PC, tutto in locale.
+"""EnterElectro-Recomp - launcher (prototipo, 27/10/2026): dal disco dell'utente al gioco per PC, tutto in locale.
 
-English: SM2-Recomp launcher - from the user's own disc to the PC game, everything done locally. Commands (the Italian
+English: EnterElectro-Recomp launcher - from the user's own disc to the PC game, everything done locally. Commands (the Italian
 names keep working): identify, import, install, play, options, status, gui, text, prepare-recording. Messages are in
 Italian or English (tools/sm2_lingua.py: --lingua/--language it|en, SM2_LINGUA, lingua.txt, Windows display language).
 
@@ -30,7 +30,7 @@ Comandi:
                              la finestra delle impostazioni di psxrecomp prima del gioco)
   opzioni --profilo P        opzioni che restano (mod di psxrecomp: --risoluzione, --pgxp si|no,
                              --filtro-texture, --scaling, --crt si|no, --audio-hq si|no, --widescreen
-                             no|16:9|16:10|21:9, --distanza si|no), scritte in
+                             no|16:9|16:10|21:9|adatta, --distanza si|no), scritte in
                              mods/state.toml accanto all'eseguibile, e --attese si|no (salto delle
                              attese, nel game.toml); dal 31/10/2026 anche lo schermo e la presentazione,
                              in settings.toml accanto all'eseguibile: --sincronia accesa|spenta|adattiva|vrr,
@@ -50,6 +50,7 @@ import argparse
 import datetime
 import hashlib
 import json
+import mmap
 import os
 import re
 import shutil
@@ -62,8 +63,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sm2_lingua import NOMI_EN, T, imposta as imposta_lingua, lingua as lingua_scelta, lingua_gioco, nome_versione  # noqa: E402,F401
+import sm2_comandi  # noqa: E402  (0.12: controller e tasti del giocatore 1)
+import sm2_salvataggi  # noqa: E402  (0.12: memory card e salvataggi rapidi)
 
-VERSIONE = '0.11'
+VERSIONE = '0.12'
 ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ROOT / 'tools'
 CATALOGO = ROOT / 'aot' / 'sm2_versioni.json'
@@ -568,6 +571,30 @@ def disco_della_versione(prof: str, cache: CacheHash, cat: dict):
     return None
 
 
+def disco_installato(prof: str, cartella: Path, stato: dict) -> Path:
+    """Il disco di un'installazione: quello scritto in installazione.json oppure, se li' non c'e' piu' (cartella
+    spostata, per esempio con importa-cartella da una versione precedente), lo stesso file in input\\<PROFILO>\\ di
+    questa cartella, o l'unico .cue che c'e'. In quel caso aggiorna installazione.json (0.12, 5/11/2026)."""
+    cue = Path(stato.get('disco') or '')
+    if cue.is_file():
+        return cue
+    dir_in = INPUT / prof
+    alt = dir_in / cue.name if cue.name else None
+    if alt is None or not alt.is_file():
+        cue_qui = sorted(dir_in.glob('*.cue')) if dir_in.is_dir() else []
+        alt = cue_qui[0] if len(cue_qui) == 1 else None
+    if alt is None:
+        return cue
+    stato['disco'] = str(alt)
+    try:
+        (cartella / 'installazione.json').write_text(json.dumps(stato, indent=1, ensure_ascii=False), encoding='utf-8')
+    except OSError:
+        pass
+    log(T(f'disco dell\'installazione: {alt} (aggiornato in installazione.json)',
+          f'installation disc: {alt} (updated in installazione.json)'))
+    return alt
+
+
 # ------------------------------------------------------------------------------------------ toolchain
 
 def attiva_toolchain() -> str:
@@ -594,8 +621,86 @@ def attiva_toolchain() -> str:
     sdl3 = tc / 'deps' / 'lib' / 'cmake' / 'SDL3'
     if (sdl3 / 'SDL3Config.cmake').is_file() or (sdl3 / 'SDL3-config.cmake').is_file():
         os.environ['SDL3_DIR'] = str(sdl3)
+    os.environ.update(ambiente_cache_compilatore())
     return T('toolchain portatile attivo (solo per questo processo): ',
              'portable toolchain active (only for this process): ') + str(tc)
+
+
+# 0.12: cache del compilatore nella cartella del progetto. Il CMake di psxrecomp usa gia' ccache (bin\ccache.exe del
+# toolchain) come lanciatore del compilatore; senza queste impostazioni la cache sta in %LOCALAPPDATA%\ccache e ha i
+# percorsi assoluti nella chiave, quindi tra due cartelle non c'e' nessun riuso. Qui sta in cache\compilatore, con i
+# percorsi relativi alla radice: una reinstallazione ricompila solo quello che e' cambiato, e il pacchetto la porta gia'
+# piena con gli oggetti del motore (mai quelli del codice del gioco): il "motore precompilato" (via dell'utente del
+# 4/11/2026). Gli oggetti sono gli stessi che farebbe il compilatore, quindi il gioco e' identico.
+CACHE_COMPILATORE = ROOT / 'cache' / 'compilatore'
+# 0.12: i file che CMake e Ninja scrivono nelle cartelle di compilazione, con i percorsi assoluti della cartella
+GENERATI_CMAKE = ('CMakeCache.txt', 'CMakeFiles', '_deps', 'build.ninja', '.ninja_deps', '.ninja_log', 'cmake_install.cmake',
+                  'CTestTestfile.cmake')
+CACHE_COMPILATORE_MASSIMO = '2G'     # un'installazione intera occupa circa 60 MB (4/11/2026)
+
+
+def id_toolchain() -> str:
+    """Identita' del compilatore per la chiave della cache: nome del toolchain e grandezza dei suoi file principali
+    (il compilatore e' sempre quello del pacchetto; un toolchain diverso da' una chiave diversa)."""
+    parti, visti = [TOOLCHAIN.name], set()
+    for schema in ('bin/clang-[0-9]*.exe', 'bin/libLLVM-*.dll', 'bin/clang-[0-9]*', 'lib/libLLVM*.so*'):
+        for p in sorted(TOOLCHAIN.glob(schema))[:1]:
+            if p.name in visti:
+                continue
+            visti.add(p.name)
+            try:
+                parti.append(f'{p.name}:{p.stat().st_size}')
+            except OSError:
+                pass
+    return '/'.join(parti)
+
+
+def ambiente_cache_compilatore() -> dict:
+    """Impostazioni di ccache per le compilazioni del launcher. CCACHE_IGNOREOPTIONS: psxrecomp passa a ogni file il
+    percorso assoluto di build-release\\psx_execution\\psx-runtime\\profile.h in -DPSX_EXECUTION_PROFILE_CONFIG, che
+    cambia da una cartella all'altra; l'opzione serve solo a #include in execution_profile.h, e i file inclusi ccache li
+    controlla comunque uno per uno, quindi toglierla dalla chiave e' sicuro e permette il riuso diretto (senza
+    preprocessore) negli altri file (prove del 4/11/2026, lavori 23-25)."""
+    amb = {'CCACHE_DIR': str(CACHE_COMPILATORE), 'CCACHE_BASEDIR': ROOT.as_posix(),
+           'CCACHE_COMPILERCHECK': 'string:' + id_toolchain(), 'CCACHE_NOHASHDIR': '1',
+           'CCACHE_IGNOREOPTIONS': '-DPSX_EXECUTION_PROFILE_CONFIG=*', 'CCACHE_MAXSIZE': CACHE_COMPILATORE_MASSIMO}
+    # 5/11/2026: ccache anche per le cartelle di compilazione che CMake configura per la prima volta: gli emettitori di
+    # psxrecomp (psxrecomp-game e psxrecomp-bios, che "generate" compila in psxrecomp\recompiler\build: 95 s di CPU) e
+    # le librerie libchdr e libwebp del gioco, che il CMake di psxrecomp lasciava fuori. CMake prende il lanciatore da
+    # queste variabili solo alla prima configurazione di una cartella; le cartelle gia' configurate non cambiano.
+    exe = TOOLCHAIN / 'bin' / ('ccache.exe' if os.name == 'nt' else 'ccache')
+    if exe.is_file():
+        amb['CMAKE_C_COMPILER_LAUNCHER'] = str(exe)
+        amb['CMAKE_CXX_COMPILER_LAUNCHER'] = str(exe)
+    return amb
+
+
+def sposta_cache_compilatore(da: Path, a: Path, prova: bool = False) -> tuple:
+    """Sposta in a i file della cache del compilatore da che non ci sono gia' (la cache e' fatta per contenuto: lo stesso
+    nome e' lo stesso oggetto). Lascia in da i file doppi, la configurazione e i contatori. Poi ricalcola i totali della
+    cache (ccache --cleanup). Restituisce (spostati, gia' presenti)."""
+    n = gia = 0
+    for f in sorted(da.rglob('*')):
+        if not f.is_file() or f.name in ('ccache.conf', 'stats') or f.name.endswith(('.lock', '.alive', '.tmp')) or \
+                '.tmp.' in f.name or 'tmp' in f.relative_to(da).parts[:-1]:
+            continue
+        dest = a / f.relative_to(da)
+        if dest.exists():
+            gia += 1
+            continue
+        n += 1
+        if not prova:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(f), str(dest))
+    exe = TOOLCHAIN / 'bin' / ('ccache.exe' if os.name == 'nt' else 'ccache')
+    if n and not prova and exe.is_file():
+        try:
+            subprocess.run([str(exe), '--cleanup'], env=dict(os.environ, **ambiente_cache_compilatore()),
+                           capture_output=True, timeout=600,
+                           creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return n, gia
 
 
 def dipendenze_offline() -> str:
@@ -623,6 +728,63 @@ def dipendenze_offline() -> str:
              'psxrecomp libraries all in the package (libchdr, libwebp): the build downloads nothing from the internet')
 
 
+# 0.12 finale (7/11/2026): il toolchain degli overlay di psxrecomp (tools/overlay/). Dopo ogni compilazione psxrecomp
+# prepara accanto all'eseguibile overlay_toolchain/ (Python incorporabile, TinyCC, il traduttore e gli header) per
+# compilare sul PC del giocatore, mentre gioca, i pezzi di codice non compilati in anticipo; i due archivi li prende da
+# <installazione>/.cache/overlay-toolchain/ e, se mancano, li scarica da internet (tools/release_stage.py di psxrecomp,
+# stage_toolchain; ogni archivio controllato con la SHA-256 a ogni uso). Senza internet (pacchetti fino al 6/11/2026)
+# aspettava circa 14 s e lasciava la compilazione al volo spenta. Il pacchetto li contiene: si copiano nell'installazione
+# prima di compilare, cosi' psxrecomp non scarica niente.
+CARTELLA_OVERLAY = TOOLS / 'overlay'
+ARCHIVI_OVERLAY = {     # nome: SHA-256, come TOOLCHAIN_PINS['win'] in psxrecomp/tools/release_stage.py
+    'python-3.13.1-embed-amd64.zip': '7b7923ff0183a8b8fca90f6047184b419b108cb437f75fc1c002f9d2f8bcec16',
+    'tcc-0.9.27-win64-bin.zip': '34a721949a2583fdff725312da092fa0f5f1f284b702e6f811c6954714faabb2',
+}
+
+
+def _sha256_file(p: Path) -> str:
+    h = hashlib.sha256()
+    with open(p, 'rb') as f:
+        for blocco in iter(lambda: f.read(1 << 20), b''):
+            h.update(blocco)
+    return h.hexdigest()
+
+
+def toolchain_overlay(cartella: Path) -> str:
+    """Copia gli archivi del toolchain degli overlay di psxrecomp dal pacchetto (tools/overlay/) in
+    <cartella>/.cache/overlay-toolchain/, dove psxrecomp li cerca prima di scaricarli. Non riscrive un archivio gia'
+    giusto; se nel pacchetto ne manca uno (per esempio con git clone) lo dice: psxrecomp provera' a scaricarlo."""
+    dest = cartella / '.cache' / 'overlay-toolchain'
+    copiati, mancano = [], []
+    for nome, sha in ARCHIVI_OVERLAY.items():
+        d = dest / nome
+        try:
+            if d.is_file() and _sha256_file(d) == sha:
+                continue
+            s = CARTELLA_OVERLAY / nome
+            if not s.is_file() or _sha256_file(s) != sha:
+                mancano.append(nome)
+                continue
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(s, d)
+            copiati.append(nome)
+        except OSError as e:
+            mancano.append(f'{nome} ({e})')
+    if mancano:
+        return T('avviso: toolchain degli overlay di psxrecomp non nel pacchetto (' + ', '.join(mancano) + '): psxrecomp '
+                 'provera\' a scaricarlo da internet; senza, il codice non compilato in anticipo va con l\'interprete',
+                 'warning: psxrecomp\'s overlay toolchain is not in the package (' + ', '.join(mancano) + '): psxrecomp '
+                 'will try to download it from the internet; without it, the code not compiled in advance runs in the '
+                 'interpreter')
+    n = len(copiati)
+    return T('toolchain degli overlay di psxrecomp dal pacchetto (Python 3.13.1 e TinyCC 0.9.27): niente da scaricare' +
+             ((' (1 archivio copiato nell\'installazione)' if n == 1 else f' ({n} archivi copiati nell\'installazione)')
+              if n else ''),
+             'psxrecomp\'s overlay toolchain from the package (Python 3.13.1 and TinyCC 0.9.27): nothing to download' +
+             ((' (1 archive copied into the installation)' if n == 1 else f' ({n} archives copied into the installation)')
+              if n else ''))
+
+
 def imposta_core(n: int) -> int:
     """Core per compilare: di default tre quarti dei processori logici (24 su 32), come chiesto il 27/10/2026:
     quasi tutta la velocita' e un po' di margine per il resto del PC."""
@@ -633,10 +795,62 @@ def imposta_core(n: int) -> int:
     return n
 
 
+# 0.12 finale (7/11/2026 notte, "Rendilo piu' veloce gia' adesso"): installazione piu' veloce. Il collegamento finale
+# ThinLTO del gioco usa da solo un thread per core fisico; sui processori 0-3 dell'i9, come il portatile di prova (2
+# core, 4 thread), con la USA Rev 1 e il PGO pronto: 200,1 s con 2 thread, 160,1 s con 3, cioe' i core di compilazione
+# che il launcher usa su 4 processori (lavoro 86). Il numero di thread non cambia il codice: ThinLTO ottimizza ogni
+# modulo per conto suo e il risultato non dipende da quanti thread lavorano.
+FILE_COMPILAZIONE = 'sm2_compilazione.cmake'
+
+
+def scrivi_compilazione(cartella: Path) -> str:
+    """Scrive <cartella>/sm2_compilazione.cmake (incluso dal CMakeLists del gioco) prima di una compilazione: su Windows
+    (llvm-mingw, collegamento con lld) i thread del collegamento finale ThinLTO = i core di compilazione. Restituisce la
+    riga per il registro."""
+    try:
+        core = int(os.environ.get('CMAKE_BUILD_PARALLEL_LEVEL') or 0) or (os.cpu_count() or 2)
+    except ValueError:
+        core = os.cpu_count() or 2
+    righe = ['# EnterElectro-Recomp: scritto da tools/sm2_launcher.py prima di ogni compilazione (non cambiarlo a mano).']
+    if os.name == 'nt':
+        righe += ['# Thread del collegamento finale ThinLTO: i core di compilazione (LLVM da solo ne usa uno per core '
+                  'fisico).',
+                  f'target_link_options(psx-runtime PRIVATE "-Wl,--thinlto-jobs={core}")']
+        testo = T(f'[compila] collegamento finale con {core} thread', f'[compile] final link with {core} threads')
+    else:
+        testo = T('[compila] collegamento finale come lo sceglie il linker', '[compile] final link as the linker chooses')
+    scrivi_se_diverso(cartella / FILE_COMPILAZIONE, '\n'.join(righe) + '\n')
+    return testo
+
+
+def spegni_toolchain_overlay(cartella_exe: Path) -> str:
+    """Installazioni con il registratore (0.12 finale, QA-013): il toolchain degli overlay che psxrecomp mette accanto
+    all'eseguibile (overlay_toolchain) viene spostato in overlay_toolchain_spento, cosi' il gioco non compila niente al
+    volo ne' quando si registra ne' quando replay-diagnostics di psxrecomp rigioca la partita (toglie le variabili PSX_
+    dall'ambiente, quindi PSX_OVERLAY_AUTOCOMPILE_OFF da solo non basta). Restituisce la riga per il registro."""
+    tk = cartella_exe / 'overlay_toolchain'
+    if not tk.is_dir():
+        return T(f'registratore: nessun toolchain degli overlay accanto a {cartella_exe.name}\\ (compilazione al volo spenta)',
+                 f'recorder: no overlay toolchain next to {cartella_exe.name}\\ (compilation on the fly off)')
+    dest = cartella_exe / 'overlay_toolchain_spento'
+    if dest.exists():
+        dest = cartella_exe / f'overlay_toolchain_spento_{time.strftime("%Y%m%d_%H%M%S")}'
+    try:
+        tk.rename(dest)
+    except OSError as e:
+        return T(f'ATTENZIONE: toolchain degli overlay non spostato ({e}): la rigiocata esatta si puo\' fermare dove il '
+                 'gioco compila codice nuovo',
+                 f'WARNING: overlay toolchain not moved ({e}): the exact replay may stop where the game compiles new code')
+    return T(f'registratore: toolchain degli overlay spostato in {cartella_exe.name}\\{dest.name} (niente compilazione '
+             'al volo, ne\' quando si registra ne\' quando si rigioca)',
+             f'recorder: overlay toolchain moved to {cartella_exe.name}\\{dest.name} (no compilation on the fly, '
+             'neither while recording nor while replaying)')
+
+
 # ------------------------------------------------------------------------------------------- progetto
 
 CMAKELISTS = r'''cmake_minimum_required(VERSION 3.20)
-# SM2-Recomp - @NOME@ (@PROFILO@). Progetto scritto da tools/sm2_launcher.py a partire dal disco
+# EnterElectro-Recomp - @NOME@ (@PROFILO@). Progetto scritto da tools/sm2_launcher.py a partire dal disco
 # dell'utente: il codice C del gioco viene generato qui, in locale (generated/, mai nel repository).
 # psxrecomp e recomp-ui sono giunzioni alle cartelle della radice del progetto.
 set(PSXRECOMP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/psxrecomp" CACHE PATH "Path to psxrecomp")
@@ -644,7 +858,7 @@ if(NOT EXISTS "${PSXRECOMP_ROOT}/runtime/runtime.cmake")
     message(FATAL_ERROR "PSXRecomp runtime is missing: ${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 endif()
 
-project(SM2_Recomp LANGUAGES C CXX)
+project(EnterElectro_Recomp LANGUAGES C CXX)
 
 # Niente procedura guidata di psxrecomp (setup wizard, "Generate & rebuild"): generazione e
 # compilazione le fa il launcher, e la procedura guidata lancerebbe ensure-toolchain, che scrive nel
@@ -652,7 +866,7 @@ project(SM2_Recomp LANGUAGES C CXX)
 # Ottimizzazione su tutto il programma (ThinLTO, opzione PSX_RUNTIME_IPO di psxrecomp; 2/11/2026): circa il 10%
 # di lavoro in meno per frame, comportamento del gioco identico. Valore di partenza: si puo' cambiare con
 # -DPSX_RUNTIME_IPO=OFF; con un psxrecomp che non ha l'opzione non fa niente.
-set(PSX_RUNTIME_IPO ON CACHE BOOL "SM2-Recomp: ottimizzazione su tutto il programma (ThinLTO)")
+set(PSX_RUNTIME_IPO ON CACHE BOOL "EnterElectro-Recomp: ottimizzazione su tutto il programma (ThinLTO)")
 include("${PSXRECOMP_ROOT}/runtime/runtime.cmake")
 
 set(PSX_PRELOADED_MODS "${CMAKE_CURRENT_SOURCE_DIR}/mods/preloaded")
@@ -673,7 +887,7 @@ psxrecomp_add_game_runtime(psx-runtime
     GEN_FULL_GLOB "generated/@EXE@_full_*.c"
 )
 
-# Mod "Widescreen" di SM2-Recomp (spenta di default, si accende tra le mod o con sm2_launcher.py opzioni
+# Mod "Widescreen" di EnterElectro-Recomp (spenta di default, si accende tra le mod o con sm2_launcher.py opzioni
 # --widescreen 16:9): il plugin sceglie le proporzioni prima che la finestra si apra. Il pacchetto della
 # mod e' in mods/preloaded/, le impostazioni dell'HUD nella sezione [widescreen] del game.toml.
 target_sources(psx-runtime PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mods_src/sm2_widescreen.c")
@@ -703,6 +917,11 @@ foreach(_PSX_RUNTIME_CONFIG game.toml game_options.toml)
             VERBATIM)
     endif()
 endforeach()
+
+# EnterElectro-Recomp 0.12: compilazione piu' veloce. Il launcher scrive sm2_compilazione.cmake prima di ogni compilazione: i
+# thread del collegamento finale ThinLTO (cambia solo quanti thread lavorano, non il codice). Senza il file non cambia
+# niente.
+include("${CMAKE_CURRENT_SOURCE_DIR}/sm2_compilazione.cmake" OPTIONAL)
 '''
 
 # QA, livello 4 (3/11/2026): registratore delle partite di psxrecomp (Playtest Diagnostics), solo nelle installazioni di
@@ -710,7 +929,7 @@ endforeach()
 # controllo della RAM in saves/diagnostics/ accanto all'eseguibile, per rigiocare la stessa partita con
 # replay-diagnostics.py (psxrecomp/docs/PLAYTEST_DIAGNOSTICS.md). Non cambia il gioco.
 CMAKE_REGISTRATORE = '''
-# QA di SM2-Recomp (installa --registratore): registratore delle partite di psxrecomp (Playtest Diagnostics).
+# QA di EnterElectro-Recomp (installa --registratore): registratore delle partite di psxrecomp (Playtest Diagnostics).
 # Registra i tasti e un controllo della RAM a ogni frame in saves/diagnostics/ accanto all'eseguibile, per rigiocare la
 # stessa partita (replay-diagnostics.py). Il pacchetto sm2.diagnostics e' in mods/preloaded/. Non cambia il gioco.
 include("${PSXRECOMP_ROOT}/runtime/playtest_diagnostics.cmake")
@@ -721,7 +940,7 @@ MANIFESTO_DIAGNOSTICA = '''format_version = 5
 id = "sm2.diagnostics"
 version = "1.0.0"
 name = "Playtest diagnostics"
-author = "SM2-Recomp"
+author = "EnterElectro-Recomp"
 description = "Test builds only: records the controller and a RAM check every frame in saves/diagnostics, so the same game can be replayed exactly (replay-diagnostics.py). It does not change the game."
 resolver = "declarative"
 save_compatibility = "shared"
@@ -763,7 +982,7 @@ status = "guessed"
 note = "SYSTEM.CNF / EXE entry PC (probe seed)"
 '''
 
-GPU_PREFERITA = r'''/* SM2-Recomp - scheda video dedicata sui portatili con due schede video, scritto da tools/sm2_launcher.py.
+GPU_PREFERITA = r'''/* EnterElectro-Recomp - scheda video dedicata sui portatili con due schede video, scritto da tools/sm2_launcher.py.
  *
  * I driver NVIDIA (Optimus) e AMD (PowerXpress / Switchable Graphics) leggono queste due variabili esportate
  * dall'eseguibile del gioco: se valgono 1 usano la scheda dedicata invece di quella integrata nel processore.
@@ -776,12 +995,17 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 '''
 
 
-PLUGIN_WIDESCREEN = r'''/* SM2-Recomp - mod "Widescreen" di Spider-Man 2: Enter Electro, scritta da tools/sm2_launcher.py.
+PLUGIN_WIDESCREEN = r'''/* EnterElectro-Recomp - mod "Widescreen" di Spider-Man 2: Enter Electro, scritta da tools/sm2_launcher.py.
  *
  * Quando il giocatore accende la mod (pacchetto sm2.enhancement.widescreen in mods/preloaded/), questo
  * plugin sceglie le proporzioni della finestra prima che si apra. Il resto lo fa psxrecomp: proiezione
  * della scena piu' larga e HUD con le proporzioni giuste (chiavi [widescreen] del game.toml). Con la mod
  * spenta non succede niente: il gioco resta in 4:3 com'e'.
+ * Scelta "fit", «Adatta alla finestra» (launcher 0.12): la prima finestra si apre a 16:9, poi l'immagine segue la
+ * forma della finestra ogni volta che cambia (anche a schermo intero), da 4:3 in su senza limite: e' la funzione
+ * psx_mod_set_adaptive_display_aspect(0, 0) di psxrecomp. Idea presa dalla mod "Adaptive Widescreen" di Matthew
+ * Stanley per Spider-Man 2 (scelta "Fit to window"). Il contatore sm2.widescreen.fit vale 1 se psxrecomp l'ha
+ * accettata.
  */
 #include "mod_plugins.h"
 
@@ -790,6 +1014,7 @@ PLUGIN_WIDESCREEN = r'''/* SM2-Recomp - mod "Widescreen" di Spider-Man 2: Enter 
 static void sm2_widescreen_attiva(void) {
     char scelta[16] = "";
     uint32_t num = 16, den = 9;
+    int adatta = 0;
     if (psx_mod_current_option_value("aspect", scelta, (uint32_t)sizeof scelta)) {
         if (strcmp(scelta, "21:9") == 0) {
             num = 21;
@@ -797,9 +1022,13 @@ static void sm2_widescreen_attiva(void) {
         } else if (strcmp(scelta, "16:10") == 0) {
             num = 16;
             den = 10;
+        } else if (strcmp(scelta, "fit") == 0) {
+            adatta = 1;
         }
     }
     (void)psx_mod_set_fixed_display_aspect(num, den);
+    if (adatta && psx_mod_set_adaptive_display_aspect(0u, 0u))
+        psx_mod_counter_add("sm2.widescreen.fit", 1u);
 }
 
 PSX_MOD_CONSTRUCTOR(sm2_widescreen_registra) {
@@ -811,7 +1040,7 @@ MANIFESTO_WIDESCREEN = '''format_version = 5
 id = "sm2.enhancement.widescreen"
 version = "1.0.0"
 name = "Widescreen"
-author = "SM2-Recomp"
+author = "EnterElectro-Recomp"
 description = "Wider view for Spider-Man 2: Enter Electro: the 3D scene is projected wider, the floor and the objects at the sides are drawn, and the HUD keeps its proportions. Menus and 2D screens stay 4:3."
 resolver = "declarative"
 save_compatibility = "shared"
@@ -830,7 +1059,7 @@ default_enabled = false
 feature = "widescreen"
 id = "aspect"
 label = "Aspect ratio"
-description = "Shape of the game window."
+description = "Shape of the game window. Fit to window follows the window whenever its shape changes (fullscreen too), from 4:3 up with no limit."
 group = "Visual"
 type = "choice"
 default = "16:9"
@@ -846,6 +1075,10 @@ label = "16:10"
 [[option.choice]]
 value = "21:9"
 label = "21:9"
+
+[[option.choice]]
+value = "fit"
+label = "Fit to window"
 
 [[plugin]]
 feature = "widescreen"
@@ -888,7 +1121,7 @@ def aggiorna_toml_widescreen(toml: Path) -> str:
 
 
 
-PLUGIN_DISTANZA = r'''/* SM2-Recomp - mod "Distanza visiva" di Spider-Man 2: Enter Electro, @NOME@ (@PROFILO@).
+PLUGIN_DISTANZA = r'''/* EnterElectro-Recomp - mod "Distanza visiva" di Spider-Man 2: Enter Electro, @NOME@ (@PROFILO@).
  * Scritta da tools/sm2_launcher.py con gli indirizzi di aot/sm2_renderer.json, controllati
  * sull'eseguibile di questa versione prima di scrivere questo file.
  *
@@ -1209,7 +1442,7 @@ def imposta_gte(toml: Path, valore: bool) -> str:
     return T(f'game.toml: {voluto} nella sezione [widescreen]', f'game.toml: {voluto} in the [widescreen] section')
 
 
-PLUGIN_DISTANZA_INIT = r'''/* SM2-Recomp - registrazione della mod "Distanza visiva" (sm2_draw_distance.cpp) prima di main(),
+PLUGIN_DISTANZA_INIT = r'''/* EnterElectro-Recomp - registrazione della mod "Distanza visiva" (sm2_draw_distance.cpp) prima di main(),
  * con lo stesso meccanismo delle mod incluse in psxrecomp. Scritto da tools/sm2_launcher.py. */
 #include "mod_plugins.h"
 
@@ -1224,7 +1457,7 @@ MANIFESTO_DISTANZA = '''format_version = 5
 id = "sm2.enhancement.draw-distance"
 version = "1.0.0"
 name = "Draw distance"
-author = "SM2-Recomp"
+author = "EnterElectro-Recomp"
 description = "Spider-Man 2: Enter Electro (@NOME@): the fog starts farther away@PIU_POLIGONI@, through psxrecomp's Neversoft renderer extension. Written for the game version of this installation."
 resolver = "declarative"
 save_compatibility = "shared"
@@ -1272,7 +1505,7 @@ feature = "packet-area"
 id = "sm2.packet-area"
 '''
 REQUISITO_AREA = '''
-# SM2-Recomp (launcher v0.11): con lo schermo largo il gioco disegna piu' poligoni; il widescreen accende per la
+# EnterElectro-Recomp (launcher v0.11): con lo schermo largo il gioco disegna piu' poligoni; il widescreen accende per la
 # sessione l'area dei pacchetti piu' grande del pacchetto della distanza visiva (funzione nascosta).
 [[requirement]]
 feature = "widescreen"
@@ -1601,8 +1834,8 @@ def imposta_chiave_toml(path: Path, sezione: str, chiave: str, valore) -> str:
     Restituisce cosa ha cambiato ('' se niente)."""
     testo = path.read_text(encoding='utf-8') if path.is_file() else ''
     righe = testo.splitlines()
-    v = ('true' if valore else 'false') if isinstance(valore, bool) else (str(valore) if isinstance(valore, int)
-                                                                          else _q(valore))
+    v = ('true' if valore else 'false') if isinstance(valore, bool) else (
+        str(valore) if isinstance(valore, int) else repr(float(valore)) if isinstance(valore, float) else _q(valore))
     riga_nuova = f'{chiave} = {v}'
     inizio = next((i for i, r in enumerate(righe) if r.strip() == f'[{sezione}]'), None)
     if inizio is None:
@@ -1657,6 +1890,66 @@ def attese_accese(toml: Path) -> bool:
 
 # ------------------------------------------------------------------------------------------------- PGO (v0.10)
 
+# Profili PGO gia' pronti (0.12). Il codice C tradotto e' identico per tutti quelli che hanno lo stesso disco e lo
+# stesso launcher (provato il 4/11/2026 su due installazioni: 128 file su 129 uguali, diverso solo un rapporto), quindi
+# un profilo fatto da noi con la partita di allenamento vale per tutti: niente eseguibile strumentato e niente
+# partita, cioe' circa meta' del tempo dell'installazione con il PGO. Il profilo si usa solo se l'impronta del codice
+# tradotto e' esattamente quella con cui e' stato fatto; altrimenti si fa l'allenamento come prima. Un profilo non
+# cambia mai il comportamento del gioco, solo come il compilatore ottimizza.
+# Ready-made PGO profiles (0.12): used only when the translated code fingerprint matches exactly; otherwise the
+# training run is done as before. A profile never changes the game's behaviour, only how the compiler optimises.
+PGO_PRONTI = ROOT / 'aot' / 'pgo'
+# Esclusi dall'impronta del codice tradotto: il rapporto che cambia a ogni installazione e (0.12, 6/11/2026) le
+# impronte della traduzione scritte dal launcher per saltarla nelle reinstallazioni: non sono codice, e con loro
+# dentro l'impronta non corrispondeva piu' a quella dei profili PGO gia' pronti (lavoro 60: allenamento invece del
+# profilo pronto).
+IMPRONTA_ESCLUSI = {'generated/aot/AOT_STATIC_AUDIT.json', 'generated/sm2_traduzione.json'}
+
+
+def impronta_codice(cartella: Path) -> dict:
+    """Impronta SHA-256 del codice tradotto di un'installazione (generated\\ e aot\\, senza i rapporti): l'elenco
+    "percorso, grandezza, SHA-256" di ogni file, in ordine, e l'impronta di quell'elenco."""
+    righe, n, byte = [], 0, 0
+    for sub in ('generated', 'aot'):
+        d = cartella / sub
+        if not d.is_dir():
+            continue
+        files = [(str(x.relative_to(cartella)).replace('\\', '/'), x) for x in d.rglob('*') if x.is_file()]
+        for rel, x in sorted(files):
+            if rel in IMPRONTA_ESCLUSI:
+                continue
+            h = hashlib.sha256()
+            with open(x, 'rb') as f:
+                for blk in iter(lambda: f.read(1 << 20), b''):
+                    h.update(blk)
+            dim = x.stat().st_size
+            righe.append(f'{rel}\t{dim}\t{h.hexdigest()}\n')
+            n += 1
+            byte += dim
+    return {'sha256': hashlib.sha256(''.join(righe).encode('utf-8')).hexdigest(), 'file': n, 'byte': byte}
+
+
+def indice_pgo_pronti() -> dict:
+    try:
+        d = json.loads((PGO_PRONTI / 'indice.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {'formato': 1, 'profili': []}
+    d.setdefault('profili', [])
+    return d
+
+
+def pgo_pronto(prof: str, impronta: str, variante: str = ''):
+    """La voce del profilo gia' pronto per questo codice (stessa versione, stessa impronta e stessa variante), o None.
+    Variante "pgxp" per gli eseguibili con i punti di aggancio di PGXP (6/11/2026): il codice C e' lo stesso, quindi
+    l'impronta e' la stessa, ma compilato con -DPSX_PGXP=1 ha funzioni diverse e il profilo dell'altra variante non
+    gli serve."""
+    for v in indice_pgo_pronti()['profili']:
+        if v.get('profilo') == prof and v.get('impronta_codice') == impronta and \
+                (v.get('variante') or '') == variante and (PGO_PRONTI / str(v.get('file'))).is_file():
+            return v
+    return None
+
+
 PGO_PORTA = 4390
 PGO_TASTI = {'NONE': 0xFFFF, 'START': 0xFFF7, 'CROSS': 0xBFFF, 'CIRCLE': 0xDFFF, 'TRIANGLE': 0xEFFF,
              'SQUARE': 0x7FFF, 'UP': 0xFFEF, 'DOWN': 0xFFBF, 'LEFT': 0xFF7F, 'RIGHT': 0xFFDF}
@@ -1693,10 +1986,18 @@ def percorso_tasti(tasti: list, inizio: int, tieni: int = 8) -> list:
     return passi
 
 
-def allena_pgo(prof: str, exe: Path, toml: Path, cue: Path, pgo_dir: Path, max_secs: int = 1800) -> dict:
+def allena_pgo(prof: str, exe: Path, toml: Path, cue: Path, pgo_dir: Path, max_secs: int = 1800,
+               pgxp: bool = False) -> dict:
     """Partita di allenamento del PGO con l'eseguibile strumentato: finestra nascosta, audio finto, tasti a frame
     esatti dal server di debug fino all'ultimo frame, poi chiusura dal server di debug (cosi' l'eseguibile scrive i
-    conteggi in pgo_dir). Restituisce {'ok': bool, 'errore', 'conteggi', 'secondi', ...}."""
+    conteggi in pgo_dir). Restituisce {'ok': bool, 'errore', 'conteggi', 'secondi', ...}.
+    Con pgxp (eseguibile con i punti di aggancio di PGXP, 6/11/2026) la partita si gioca con PGXP acceso e i valori
+    di partenza (geometria, texture corrette in prospettiva, culling e, come DuckStation per Spider-Man 2, modalita'
+    CPU), come lo usa chi lo sceglie: con PGXP spento il suo codice risulterebbe mai usato e il compilatore lo
+    ottimizzerebbe come codice freddo.
+    With pgxp (executable with the PGXP hooks) the training game runs with PGXP on (the defaults, CPU mode included as
+    DuckStation does for Spider-Man 2), as players use it; with PGXP off its code would look unused and be optimised
+    as cold code."""
     sys.path.insert(0, str(ROOT / 'psxrecomp' / 'tools'))
     import debug_client  # noqa: E402  (client del server di debug di psxrecomp)
     exe, toml, cue, pgo_dir = Path(exe).resolve(), Path(toml).resolve(), Path(cue).resolve(), Path(pgo_dir).resolve()
@@ -1706,6 +2007,14 @@ def allena_pgo(prof: str, exe: Path, toml: Path, cue: Path, pgo_dir: Path, max_s
     tasti, fine = tasti_allenamento(prof)
     env = dict(os.environ, LLVM_PROFILE_FILE=str(pgo_dir / 'sm2-%p.profraw'), SDL_AUDIODRIVER='dummy',
                SDL_AUDIO_DRIVER='dummy', PSX_OVERLAY_AUTOCOMPILE_OFF='1', PSX_DISPLAY_RING='0', PSX_DEBUG_TOGGLES='0')
+    for k in ('PSX_GEOMETRY_CORRECTION', 'PSX_PERSPECTIVE_TEXTURING', 'PSX_PGXP_CULLING', 'PSX_PGXP_CPU_MODE',
+              'PSX_PGXP_COLOR', 'PSX_PGXP_DEPTH'):
+        env.pop(k, None)                  # le voci di PGXP le decide solo questa funzione
+    if pgxp:
+        d = pgxp_predefiniti()
+        env.update(PSX_GEOMETRY_CORRECTION='1', PSX_PERSPECTIVE_TEXTURING='1' if d['texture'] else '0',
+                   PSX_PGXP_CULLING='1' if d['culling'] else '0', PSX_PGXP_CPU_MODE='1' if d['cpu'] else '0',
+                   PSX_PGXP_COLOR='0', PSX_PGXP_DEPTH='0')
     cmd = [str(exe), '--no-launcher', '--game', str(toml), '--disc', str(cue), '--debug-port', str(PGO_PORTA),
            '--hidden-window']
     conta = [0]
@@ -1820,6 +2129,7 @@ class Installazione:
         self.prof, self.cartella, self.disco, self.v = prof, cartella, disco, cat[prof]
         self.pgxp = pgxp
         self.registratore = registratore
+        self.allena_sempre = False          # 0.12: con --pgo-allena la partita di allenamento si fa comunque
         self.cue = Path(disco['foglio'])
         self.exe = self.v['exe']
         self.stato_path = cartella / 'installazione.json'
@@ -2173,11 +2483,106 @@ class Installazione:
                        'disco_sha1': sha1})
         return True
 
+    # 0.12 (task 77): il codice C tradotto dipende solo dal motore (psxrecomp, recomp-ui, aot del pacchetto), dal
+    # disco, dalle sezioni [game], [prepare_disc] e [recompiler] del game.toml (piu' [runtime] openbios), dal file dei
+    # semi, da symbols.toml e dal profilo dei moduli (aot/ dell'installazione). Dopo una traduzione riuscita queste
+    # impronte e l'elenco dei file prodotti (nome e grandezza) vanno in generated/sm2_traduzione.json; a una
+    # reinstallazione con le stesse impronte e gli stessi file la traduzione si salta (--rigenera la rifa comunque).
+    TRADUZIONE = 'sm2_traduzione.json'
+
+    def impronta_traduzione(self):
+        try:
+            motore = impronta_motore()
+            gt = leggi_toml(self.cartella / 'game.toml')
+        except Exception:  # noqa: BLE001  (senza impronta la traduzione si fa sempre)
+            return None
+        h = hashlib.sha256()
+        sezioni = {k: gt.get(k) for k in ('game', 'prepare_disc', 'recompiler')}
+        sezioni['openbios'] = (gt.get('runtime') or {}).get('openbios')
+        h.update(json.dumps({'motore': motore, 'disco': self.disco.get('dati_sha1'), 'game_toml': sezioni},
+                            sort_keys=True, default=str).encode('utf-8'))
+        file = []
+        semi = (gt.get('recompiler') or {}).get('seeds')
+        for rel in ([semi] if semi else []) + ['symbols.toml']:
+            file.append(self.cartella / rel)
+        aot = self.cartella / 'aot'
+        if aot.is_dir():
+            file += sorted(p for p in aot.rglob('*') if p.is_file() and 'pgo' not in p.relative_to(aot).parts)
+        for p in file:
+            h.update(p.relative_to(self.cartella).as_posix().encode('utf-8') if p.is_relative_to(self.cartella)
+                     else str(p).encode('utf-8'))
+            h.update(hashlib.sha256(p.read_bytes()).digest() if p.is_file() else b'-')
+        return h.hexdigest()
+
+    def file_tradotti(self) -> dict:
+        gen = self.cartella / 'generated'
+        return {p.relative_to(gen).as_posix(): p.stat().st_size for p in sorted(gen.rglob('*'))
+                if p.is_file() and p.name != self.TRADUZIONE} if gen.is_dir() else {}
+
+    def traduzione_valida(self, impronta) -> bool:
+        if not impronta or getattr(self, 'rigenera', False):
+            return False
+        try:
+            prima = json.loads((self.cartella / 'generated' / self.TRADUZIONE).read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            return False
+        if prima.get('impronta') != impronta or not prima.get('file'):
+            return False
+        marker = self.cartella / 'generated' / f'{self.exe}_dispatch.c'
+        return marker.is_file() and self.file_tradotti() == prima['file']
+
     def genera(self) -> bool:
+        impronta = self.impronta_traduzione()
+        if self.traduzione_valida(impronta):
+            log(T('[genera] codice C gia\' tradotto da questo disco con questo motore e le stesse impostazioni: '
+                  'traduzione saltata (per rifarla: installa --rigenera)',
+                  '[generate] C code already translated from this disc with this engine and the same settings: '
+                  'translation skipped (to redo it: install --regenerate)'))
+            return True
+        try:
+            (self.cartella / 'generated' / self.TRADUZIONE).unlink()
+        except OSError:
+            pass
         log(T('[genera] codice C del gioco (psxrecomp generate) e dei moduli compilati in anticipo',
               '[generate] C code of the game (psxrecomp generate) and of the precompiled modules'))
         ok = self.cli(['generate', '--config', 'game.toml', '--project-root', '.', '--disc', str(self.cue),
                        '--no-toolchain-download'], self.cartella / 'psxrecomp_cli_output.txt')
+        ok = self._controlla_tradotto(ok)
+        if ok and impronta:
+            try:
+                (self.cartella / 'generated' / self.TRADUZIONE).write_text(
+                    json.dumps({'impronta': impronta, 'file': self.file_tradotti()}, indent=0), encoding='utf-8')
+                self.tradotto_ora = True
+            except OSError as e:
+                log(T(f'  avviso: impronta della traduzione non salvata ({e})',
+                      f'  warning: translation fingerprint not saved ({e})'))
+        return ok
+
+    def rinnova_impronta_traduzione(self) -> None:
+        """0.12 (6/11/2026): a fine installazione, se la traduzione e' stata fatta in questa installazione, la sua
+        impronta si riscrive con il motore com'e' adesso. La compilazione puo' lasciare file nuovi nelle cartelle del
+        motore (lavoro 60: la reinstallazione subito dopo la prima installazione non saltava la traduzione perche'
+        l'impronta del motore era cambiata dopo la traduzione); il codice tradotto e' lo stesso."""
+        if not getattr(self, 'tradotto_ora', False):
+            return
+        p = self.cartella / 'generated' / self.TRADUZIONE
+        try:
+            prima = json.loads(p.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            return
+        if not prima.get('file') or prima.get('file') != self.file_tradotti():
+            return
+        imp = self.impronta_traduzione()
+        if imp and imp != prima.get('impronta'):
+            prima['impronta'] = imp
+            try:
+                p.write_text(json.dumps(prima, indent=0), encoding='utf-8')
+                log(T('  impronta della traduzione aggiornata con il motore di fine installazione',
+                      '  translation fingerprint updated with the engine at the end of the installation'))
+            except OSError:
+                pass
+
+    def _controlla_tradotto(self, ok: bool) -> bool:
         marker = self.cartella / 'generated' / f'{self.exe}_dispatch.c'
         if ok and not marker.is_file():
             log(T(f'ERRORE: manca {marker.relative_to(self.cartella)}', f'ERROR: {marker.relative_to(self.cartella)} is missing'))
@@ -2195,8 +2600,48 @@ class Installazione:
                       f'  precompiled modules: {len(parti)} C code files, {mb:.1f} MB'))
         return ok
 
+    def cartelle_di_altre_radici(self) -> list:
+        """0.12 (5/11/2026): le cartelle di compilazione fatte in un'altra cartella (installazione spostata, per esempio
+        con importa-cartella da una versione precedente) hanno i percorsi di quella cartella nei file di CMake e di
+        Ninja: CMake rifiuta un CMakeCache.txt di un'altra cartella e ogni compilazione fallirebbe. Prima di compilare
+        sposta solo quei file generati in <nome>.altra_cartella (le opzioni del giocatore accanto all'eseguibile, come
+        settings.toml, mods\\state.toml e i tasti, restano dove sono); dopo una compilazione riuscita vengono tolti.
+        Restituisce le cartelle messe da parte."""
+        da_parte = []
+        for d in ('build-release', 'build-dev', 'build-pgo-gen'):
+            bd = self.cartella / d
+            try:
+                testo = (bd / 'CMakeCache.txt').read_text(encoding='utf-8', errors='replace')
+            except OSError:
+                continue
+            m = re.search(r'^CMAKE_CACHEFILE_DIR:INTERNAL=(.*)$', testo, re.M)
+            if not m:
+                continue
+            fatta = os.path.normcase(os.path.normpath(m.group(1).strip()))
+            qui = {os.path.normcase(os.path.normpath(str(x))) for x in (bd.absolute(), bd.resolve())}
+            if fatta in qui:
+                continue
+            dest = bd.with_name(bd.name + '.altra_cartella')
+            try:
+                if dest.exists():
+                    shutil.rmtree(dest)
+                dest.mkdir()
+                for n in GENERATI_CMAKE:
+                    if (bd / n).exists():
+                        shutil.move(str(bd / n), str(dest / n))
+            except OSError as e:
+                log(T(f'  avviso: {d} compilato in un\'altra cartella ({m.group(1).strip()}): file di CMake non spostati ({e})',
+                      f'  warning: {d} was built in another folder ({m.group(1).strip()}): CMake files not moved ({e})'))
+                continue
+            da_parte.append(dest)
+            log(T(f'  {d}: compilato in un\'altra cartella ({m.group(1).strip()}): file di CMake messi da parte, la '
+                  'compilazione riparte da capo', f'  {d}: built in another folder ({m.group(1).strip()}): CMake files '
+                  'set aside, the build starts from scratch'))
+        return da_parte
+
     def compila(self, debug: bool, pgo: bool = False) -> bool:
         ok = True
+        vecchie = self.cartelle_di_altre_radici()
         fatto_pgo = self.compila_pgo() if pgo else False
         if pgo and not fatto_pgo:
             log(T('  PGO non riuscito: compilo l\'eseguibile normale, senza PGO',
@@ -2210,6 +2655,8 @@ class Installazione:
                 continue
             if build_dir == 'build-release' and fatto_pgo:
                 continue                     # gia' compilato con il PGO
+            if build_dir == 'build-release':
+                log(scrivi_compilazione(self.cartella))   # 0.12 finale: i thread del collegamento finale
             log(T(f'[compila] {desc} in {build_dir}', f'[compile] {desc} in {build_dir}'))
             ok = self.cli(['rebuild', '--config', 'game.toml', '--project-root', '.', '--build-dir', build_dir,
                            '--target', 'psx-runtime', '--exe-basename', EXE_BASE, '--no-toolchain-download',
@@ -2236,6 +2683,8 @@ class Installazione:
                     cambio = risoluzione_iniziale(self.cartella / d / 'mods' / 'state.toml')
                     if cambio:
                         log('  ' + cambio)
+            for v in vecchie:
+                shutil.rmtree(v, ignore_errors=True)       # solo file generati di CMake e Ninja di un'altra cartella
         return ok
 
     def vulkan_compilato(self) -> bool:
@@ -2253,6 +2702,26 @@ class Installazione:
         uscita = self.cartella / 'psxrecomp_cli_output.txt'
         comune = ['rebuild', '--config', 'game.toml', '--project-root', '.', '--target', 'psx-runtime',
                   '--exe-basename', EXE_BASE, '--no-toolchain-download', '--no-pgo']
+        t0 = time.time()
+        imp = impronta_codice(self.cartella)
+        voce = None if self.allena_sempre else pgo_pronto(self.prof, imp['sha256'], 'pgxp' if self.pgxp else '')
+        self.salva(impronta_codice=imp['sha256'], pgo_pronto=None)
+        log(T(f'[compila] impronta del codice tradotto: {imp["sha256"][:16]} ({imp["file"]} file, '
+              f'{imp["byte"] / 1e6:.1f} MB, {time.time() - t0:.1f} s)',
+              f'[compile] fingerprint of the translated code: {imp["sha256"][:16]} ({imp["file"]} files, '
+              f'{imp["byte"] / 1e6:.1f} MB, {time.time() - t0:.1f} s)'))
+        if voce is not None:
+            if self.compila_pgo_pronto(voce, comune, uscita):
+                return True
+            log(T('  profilo gia\' pronto non usabile: faccio la partita di allenamento come prima',
+                  '  ready-made profile not usable: doing the training game as before'))
+        elif self.allena_sempre:
+            log(T('  --pgo-allena: partita di allenamento anche se c\'e\' un profilo pronto',
+                  '  --pgo-train: training game even if a ready-made profile exists'))
+        else:
+            log(T('  nessun profilo PGO gia\' pronto per questo codice: partita di allenamento',
+                  '  no ready-made PGO profile for this code: training game'))
+        log(scrivi_compilazione(self.cartella))
         log(T('[compila] PGO 1/4: eseguibile strumentato (conta i passaggi nel codice) in build-pgo-gen',
               '[compile] PGO 1/4: instrumented executable (counts the passes through the code) in build-pgo-gen'))
         if not self.cli(comune + ['--build-dir', 'build-pgo-gen', '--cmake-extra=-DPSX_DEBUG_TOOLS=ON', '--cmake-extra=-DPSX_RUNTIME_IPO=OFF',
@@ -2263,8 +2732,10 @@ class Installazione:
             log(T('  ERRORE: manca l\'eseguibile strumentato', '  ERROR: the instrumented executable is missing'))
             return False
         log(T('[compila] PGO 2/4: partita di allenamento (finestra nascosta e audio spento, circa 3-4 minuti)',
-              '[compile] PGO 2/4: training game (hidden window, audio off, about 3-4 minutes)'))
-        r = allena_pgo(self.prof, exe, self.cartella / 'game.toml', self.cue, self.cartella / 'build-pgo-gen' / 'pgo')
+              '[compile] PGO 2/4: training game (hidden window, audio off, about 3-4 minutes)') +
+            (T(', con PGXP acceso (valori di DuckStation)', ', with PGXP on (DuckStation defaults)') if self.pgxp else ''))
+        r = allena_pgo(self.prof, exe, self.cartella / 'game.toml', self.cue, self.cartella / 'build-pgo-gen' / 'pgo',
+                       pgxp=self.pgxp)
         log(T(f'  allenamento {"riuscito" if r["ok"] else "NON riuscito"} in {r.get("secondi")} s',
               f'  training {"succeeded" if r["ok"] else "FAILED"} in {r.get("secondi")} s') +
             (f': {r["errore"]}' if r.get('errore') else '') +
@@ -2279,6 +2750,7 @@ class Installazione:
         dest = self.cartella / 'build-release' / 'pgo'
         dest.mkdir(parents=True, exist_ok=True)
         shutil.copy2(prof, dest / 'default.profdata')
+        log(scrivi_compilazione(self.cartella))     # 0.12 finale: compilazione piu' veloce
         log(T('[compila] PGO 4/4: eseguibile del gioco con il PGO in build-release',
               '[compile] PGO 4/4: game executable with PGO in build-release'))
         ok = self.cli(comune + ['--build-dir', 'build-release', '--cmake-extra=-DPSX_PGO=use'] + IPO_ON, uscita)
@@ -2289,6 +2761,41 @@ class Installazione:
         shutil.rmtree(self.cartella / 'build-pgo-gen', ignore_errors=True)     # non serve piu' (piu' di 1 GB)
         return True
 
+    def compila_pgo_pronto(self, voce: dict, comune: list, uscita: Path) -> bool:
+        """PGO con il profilo gia' pronto del pacchetto (0.12): lo scompatta in pgo\\default.profdata, lo controlla
+        e compila l'eseguibile del gioco una volta sola."""
+        import lzma
+        log(T(f'[compila] PGO con il profilo gia\' pronto {voce["file"]}: niente eseguibile strumentato e niente '
+              'partita di allenamento',
+              f'[compile] PGO with the ready-made profile {voce["file"]}: no instrumented executable and no training '
+              'game'))
+        try:
+            dati = lzma.decompress((PGO_PRONTI / voce['file']).read_bytes())
+        except (OSError, lzma.LZMAError) as e:
+            log(T(f'  ERRORE: profilo non letto ({e})', f'  ERROR: profile not read ({e})'))
+            return False
+        if hashlib.sha256(dati).hexdigest() != voce.get('sha256_profdata'):
+            log(T('  ERRORE: il profilo pronto non e\' integro (impronta diversa da quella dell\'indice)',
+                  '  ERROR: the ready-made profile is damaged (fingerprint differs from the index)'))
+            return False
+        dest = self.cartella / 'pgo' / 'default.profdata'
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(dati)
+        rel = self.cartella / 'build-release' / 'pgo'
+        rel.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(dest, rel / 'default.profdata')
+        log(scrivi_compilazione(self.cartella))     # 0.12 finale: compilazione piu' veloce
+        log(T('[compila] eseguibile del gioco con il PGO in build-release',
+              '[compile] game executable with PGO in build-release'))
+        ok = self.cli(comune + ['--build-dir', 'build-release', '--cmake-extra=-DPSX_PGO=use'] + IPO_ON, uscita)
+        exe = trova_exe(self.cartella / 'build-release')
+        if not (ok and exe):
+            return False
+        log(T(f'  {exe} ({exe.stat().st_size / 1e6:.1f} MB), con il PGO del profilo pronto',
+              f'  {exe} ({exe.stat().st_size / 1e6:.1f} MB), with PGO from the ready-made profile'))
+        self.salva(pgo_pronto=voce['file'])
+        return True
+
 
 def trova_exe(cartella: Path):
     for nome in (EXE_BASE + '.exe', EXE_BASE):
@@ -2296,6 +2803,17 @@ def trova_exe(cartella: Path):
         if p.is_file():
             return p
     return None
+
+
+def exe_contiene(exe, testo: bytes) -> bool:
+    """True se l'eseguibile contiene quel testo (per sapere se e' compilato con una modifica di psxrecomp)."""
+    if exe is None:
+        return False
+    try:
+        with open(exe, 'rb') as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
+            return m.find(testo) >= 0
+    except (OSError, ValueError):
+        return False
 
 
 def cmd_installa(args) -> int:
@@ -2310,8 +2828,8 @@ def cmd_installa(args) -> int:
     cartella.mkdir(parents=True, exist_ok=True)
     apri_log(cartella / 'launcher_log.txt')
     nome = nome_versione(prof, cat[prof]['nome'])
-    log(T(f'SM2-Recomp launcher {VERSIONE} - installazione di {prof} ({nome}) in {cartella}',
-          f'SM2-Recomp launcher {VERSIONE} - installing {prof} ({nome}) in {cartella}'))
+    log(T(f'EnterElectro-Recomp launcher {VERSIONE} - installazione di {prof} ({nome}) in {cartella}',
+          f'EnterElectro-Recomp launcher {VERSIONE} - installing {prof} ({nome}) in {cartella}'))
     cache = CacheHash(GIOCHI / 'cache_hash.json')
     if args.disco:
         disco = riconosci_dump(Path(args.disco).resolve(), cache, cat)
@@ -2339,9 +2857,12 @@ def cmd_installa(args) -> int:
         return 1
     log(attiva_toolchain())
     log(dipendenze_offline())
+    log(toolchain_overlay(cartella))           # 0.12 finale: niente download del toolchain degli overlay di psxrecomp
     log(T(f'core per compilare: {imposta_core(args.core)} su {os.cpu_count()}',
           f'cores for compiling: {imposta_core(args.core)} of {os.cpu_count()}'))
     inst = Installazione(prof, cartella, disco, cat, pgxp=args.pgxp, registratore=args.registratore)
+    inst.allena_sempre = bool(getattr(args, 'pgo_allena', False))
+    inst.rigenera = bool(getattr(args, 'rigenera', False))
     inst.salva(profilo=prof, nome=cat[prof]['nome'], disco=disco['foglio'], disco_sha1=disco['dati_sha1'],
                redump=disco['redump'], launcher=VERSIONE, completata=False, pgxp=args.pgxp,
                registratore=args.registratore)
@@ -2351,10 +2872,12 @@ def cmd_installa(args) -> int:
               'test installation with the game recorder (QA): every game is recorded in saves\\diagnostics\\ next '
               'to the executable'))
     if args.pgo:
-        log(T('eseguibile con il PGO: dopo il codice C, una partita di allenamento di circa 3 minuti (finestra nascosta, '
-              'audio spento) e una compilazione in piu\'',
-              'executable with PGO: after the C code, a training game of about 3 minutes (hidden window, audio off) '
-              'and one more build'))
+        log(T('eseguibile con il PGO: se il pacchetto ha il profilo gia\' pronto per questo codice, una sola '
+              'compilazione; altrimenti, dopo il codice C, una partita di allenamento di circa 3 minuti (finestra '
+              'nascosta, audio spento) e una compilazione in piu\'',
+              'executable with PGO: if the package has the ready-made profile for this code, a single build; '
+              'otherwise, after the C code, a training game of about 3 minutes (hidden window, audio off) and one '
+              'more build'))
     if args.pgxp:
         log(T('eseguibile con i punti di aggancio di PGXP (geometria piu\' precisa): la si accende con avvia --pgxp',
               'executable with the PGXP hooks (more precise geometry): turn it on with play --pgxp'))
@@ -2399,15 +2922,246 @@ def cmd_installa(args) -> int:
     completa = set(args.passi) >= {'prepara', 'm3', 'genera', 'compila'}
     exe = trova_exe(cartella / 'build-release')
     if args.registratore and completa:
+        # 0.12 finale (QA-013): il gioco di questa installazione parte con la compilazione al volo spenta (avvia) e senza
+        # il toolchain degli overlay accanto all'eseguibile (anche nelle rigiocate), quindi non c'e' una cache da
+        # preparare prima di registrare
         for e in [exe] + ([trova_exe(cartella / 'build-dev')] if args.debug else []):
             if e is not None:
-                log(prepara_cache_overlay(e, cartella / 'game.toml', Path(disco['foglio'])))
+                log(spegni_toolchain_overlay(e.parent))
+        log(T('registratore: compilazione al volo spenta quando si gioca, niente cache da preparare prima di registrare',
+              'recorder: compilation on the fly off while playing, no cache to prepare before recording'))
+    try:
+        motore = impronta_motore() if completa and exe is not None else None
+    except OSError as e:
+        log(T(f'avviso: impronta del motore non calcolata ({e})', f'warning: engine fingerprint not computed ({e})'))
+        motore = None
+    if motore is not None:
+        inst.rinnova_impronta_traduzione()
     inst.salva(tempi=tempi, errore=None, completata=completa and exe is not None,
-               eseguibile=str(exe) if exe else None, data=f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}')
+               eseguibile=str(exe) if exe else None, data=f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}',
+               motore=motore)
     log(T(f'\nFatto in {time.time() - t_tot:.0f} s: ', f'\nDone in {time.time() - t_tot:.0f} s: ') +
         (T(f'{prof} installato, per giocare: sm2_launcher.py avvia --profilo {prof}',
            f'{prof} installed, to play: sm2_launcher.py play --profile {prof}') if completa
          else T('passi richiesti completati', 'requested steps completed')))
+    return 0
+
+
+# ------------------------------------------------------------------------------ aggiornamenti senza reinstallare (0.12)
+
+# Ogni installazione ricorda con quale motore e' stata compilata (installazione.json, "motore"): l'impronta dei sorgenti
+# di psxrecomp e recomp-ui, dei profili di aot/ (non dei profili PGO) e il numero della "ricetta" del launcher, da
+# cambiare quando cambia quello che "installa" scrive o compila (CMakeLists, mod di EnterElectro-Recomp, opzioni di compilazione).
+# Un launcher nuovo con lo stesso motore usa le installazioni come sono; con un motore diverso le segna da reinstallare
+# (i salvataggi restano). "importa-cartella" sposta dischi, installazioni e salvataggi da una cartella precedente.
+RICETTA_INSTALLAZIONE = 12
+ESCLUSI_MOTORE = {'.git', '.github', '.cache', '__pycache__', 'tests', 'docs', 'accuracy'}
+# File che il motore scrive da se' alla prima compilazione (6/11/2026, tools\diagnostica_motore2_012.py nel lavoro 63):
+# overlay_codegen_hash.h e' l'impronta dei sorgenti del generatore di codice, che qui contano gia'. Se contasse, la prima
+# installazione cambierebbe l'impronta del motore a meta' strada (la traduzione, fatta prima, non si saltava alla prima
+# reinstallazione).
+GENERATI_MOTORE = {'psxrecomp/runtime/include/overlay_codegen_hash.h'}
+
+
+def impronta_motore() -> dict:
+    """{'sha256', 'file', 'ricetta'} del motore di questo pacchetto. Il contenuto si rilegge solo se nomi, dimensioni o
+    date dei file sono cambiati (cache in giochi/motore_cache.json)."""
+    voci = []
+    for base in ('psxrecomp', 'recomp-ui', 'aot'):
+        radice = ROOT / base
+        if not radice.is_dir():
+            continue
+        for cart, sotto, nomi in os.walk(radice):
+            sotto[:] = sorted(d for d in sotto if d not in ESCLUSI_MOTORE and not d.lower().startswith('build')
+                              and not (base == 'aot' and Path(cart) == radice and d == 'pgo'))
+            for n in sorted(nomi):
+                f = Path(cart) / n
+                rel = f.relative_to(ROOT).as_posix()
+                if rel in GENERATI_MOTORE:
+                    continue
+                st = f.stat()
+                voci.append((rel, st.st_size, st.st_mtime_ns))
+    chiave = hashlib.sha256(json.dumps([RICETTA_INSTALLAZIONE] + voci).encode('utf-8')).hexdigest()
+    cache = GIOCHI / 'motore_cache.json'
+    try:
+        c = json.loads(cache.read_text(encoding='utf-8'))
+        if c.get('chiave') == chiave:
+            return c['impronta']
+    except (OSError, ValueError, KeyError):
+        pass
+    h = hashlib.sha256(f'ricetta {RICETTA_INSTALLAZIONE}\n'.encode('utf-8'))
+    for rel, size, _ in voci:
+        h.update(f'{rel}\t{size}\t'.encode('utf-8'))
+        h.update(hashlib.sha256((ROOT / rel).read_bytes()).digest())
+    imp = {'sha256': h.hexdigest()[:16], 'file': len(voci), 'ricetta': RICETTA_INSTALLAZIONE}
+    try:
+        GIOCHI.mkdir(exist_ok=True)
+        cache.write_text(json.dumps({'chiave': chiave, 'impronta': imp}), encoding='utf-8')
+    except OSError:
+        pass
+    return imp
+
+
+def motore_uguale(stato: dict, attuale: dict | None = None):
+    """True se l'installazione e' stata compilata con il motore di questo pacchetto, False se no, None se non si sa
+    (installazioni fatte prima della 0.12, che non lo ricordano)."""
+    m = (stato or {}).get('motore')
+    if not m:
+        return None
+    try:
+        attuale = attuale or impronta_motore()
+    except OSError:
+        return None
+    return m.get('sha256') == attuale.get('sha256') and m.get('ricetta') == attuale.get('ricetta')
+
+
+def _sostituisci_radice(path: Path, vecchia: Path, nuova: Path) -> bool:
+    """Nei file di testo dell'installazione (settings.toml, game.toml) i percorsi assoluti della cartella vecchia
+    diventano quelli della nuova (con / e con \\, senza badare alle maiuscole su Windows)."""
+    try:
+        testo = path.read_text(encoding='utf-8')
+    except (OSError, UnicodeDecodeError):
+        return False
+    nuovo = testo
+    for v, n in ((str(vecchia).replace('\\', '\\\\'), str(nuova).replace('\\', '\\\\')),   # \\ nelle stringhe TOML
+                 (str(vecchia), str(nuova)), (vecchia.as_posix(), nuova.as_posix())):
+        nuovo = re.sub(re.escape(v), lambda _m, n=n: n, nuovo, flags=re.I if os.name == 'nt' else 0)
+    if nuovo == testo:
+        return False
+    path.write_text(nuovo, encoding='utf-8')
+    return True
+
+
+def _sposta(da: Path, a: Path) -> None:
+    a.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(da), str(a))
+
+
+def _e_collegamento(p: Path) -> bool:
+    """Un collegamento (giunzione di Windows o link simbolico), non una cartella vera."""
+    if p.is_symlink():
+        return True
+    isj = getattr(os.path, 'isjunction', None)
+    if isj is not None:
+        try:
+            return bool(isj(p))
+        except OSError:
+            return False
+    if os.name == 'nt':
+        try:
+            return bool(os.lstat(p).st_file_attributes & 0x400)       # FILE_ATTRIBUTE_REPARSE_POINT
+        except (OSError, AttributeError):
+            return False
+    return False
+
+
+def _togli_giunzioni(cartella: Path) -> list:
+    """Le giunzioni psxrecomp e recomp-ui di un'installazione: si tolgono solo i collegamenti, mai il contenuto (una
+    cartella vera non si tocca)."""
+    tolte = []
+    for g in GIUNZIONI:
+        p = cartella / g
+        if not _e_collegamento(p):
+            continue
+        try:
+            if os.name == 'nt':
+                os.rmdir(p)                   # su una giunzione toglie solo il collegamento
+            else:
+                p.unlink()
+            tolte.append(g)
+        except OSError as e:
+            log(T(f'  avviso: collegamento {p} non tolto ({e})', f'  warning: link {p} not removed ({e})'))
+    return tolte
+
+
+def cmd_importa_cartella(args) -> int:
+    """Prende da una cartella di una versione precedente (EnterElectro-Recomp o SM2-Recomp, il nome fino alla 0.11) i dischi (input/), le installazioni con i loro salvataggi
+    (giochi/) e la lingua, spostandoli (mai copiando a meta' o cancellando). Le installazioni compilate con lo stesso
+    motore restano pronte; le altre vanno reinstallate, ma i salvataggi restano."""
+    vecchia = Path(args.cartella).expanduser().resolve()
+    if vecchia == ROOT.resolve():
+        log(T('ERRORE: e\' questa stessa cartella', 'ERROR: it is this same folder'))
+        return 1
+    if not (vecchia / 'tools' / 'sm2_launcher.py').is_file() or not ((vecchia / 'input').is_dir() or
+                                                                     (vecchia / 'giochi').is_dir()):
+        log(T(f'ERRORE: {vecchia} non sembra una cartella di EnterElectro-Recomp o SM2-Recomp (servono '
+              'tools\\sm2_launcher.py e input\\ o giochi\\)', f'ERROR: {vecchia} does not look like an '
+              'EnterElectro-Recomp or SM2-Recomp folder (tools\\sm2_launcher.py and '
+              'input\\ or giochi\\ are needed)'))
+        return 1
+    prova = args.prova
+    log(T(f'Prendo dischi, installazioni e salvataggi da {vecchia}', f'Taking discs, installations and saves from '
+          f'{vecchia}') + (T(' (solo prova: niente viene spostato)', ' (dry run: nothing is moved)') if prova else ''))
+    attuale = impronta_motore()
+    fatti = []
+    # dischi
+    for d in sorted(p for p in (vecchia / 'input').glob('*') if p.is_dir()) if (vecchia / 'input').is_dir() else []:
+        dest = INPUT / d.name
+        if dest.exists() and any(dest.iterdir()):
+            log(T(f'  disco {d.name}: c\'e\' gia\' in questa cartella, lasciato dov\'era',
+                  f'  disc {d.name}: already in this folder, left where it was'))
+            continue
+        log(T(f'  disco {d.name}: lo sposto in input\\{d.name}', f'  disc {d.name}: moving it to input\\{d.name}'))
+        if not prova:
+            if dest.exists():
+                dest.rmdir()                      # cartella vuota
+            _sposta(d, dest)
+        fatti.append(('disco', d.name))
+    # installazioni e salvataggi
+    for g in sorted(p for p in (vecchia / 'giochi').glob('*') if p.is_dir()) if (vecchia / 'giochi').is_dir() else []:
+        try:
+            st = json.loads((g / 'installazione.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            st = None
+        dest = GIOCHI / g.name
+        if dest.exists():
+            # c'e' gia' un'installazione qui: si prendono solo i salvataggi, accanto a quelli nuovi
+            if (g / 'saves').is_dir() and any((g / 'saves').iterdir()):
+                altro = dest / f'saves_versione_precedente_{time.strftime("%Y%m%d_%H%M%S")}'
+                log(T(f'  {g.name}: c\'e\' gia\' un\'installazione qui; i salvataggi di prima vanno in {altro.name}',
+                      f'  {g.name}: there is already an installation here; the old saves go to {altro.name}'))
+                if not prova:
+                    _sposta(g / 'saves', altro)
+                fatti.append(('salvataggi', g.name))
+            continue
+        if st is None and not (g / 'saves').is_dir():
+            continue
+        uguale = motore_uguale(st, attuale) if st else None
+        log(T(f'  {g.name}: sposto l\'installazione con i salvataggi', f'  {g.name}: moving the installation with its '
+              'saves') + (T(' (stesso motore: pronta da giocare)', ' (same engine: ready to play)') if uguale else
+                          T(' (motore diverso: da reinstallare, i salvataggi restano)',
+                            ' (different engine: to be installed again, the saves stay)')))
+        if not prova:
+            tolte = _togli_giunzioni(g)
+            _sposta(g, dest)
+            for n in tolte:
+                giunzione(dest / n, ROOT / n)
+            for f in [dest / 'game.toml', dest / 'installazione.json'] + [dest / b / 'settings.toml'
+                                                                           for b in ('build-release', 'build-dev')]:
+                if f.is_file() and _sostituisci_radice(f, vecchia, ROOT):
+                    log(T(f'    percorsi aggiornati in {f.relative_to(dest)}', f'    paths updated in {f.relative_to(dest)}'))
+        fatti.append(('installazione', g.name))
+    # cache del compilatore (0.12): gli oggetti gia' compilati nella cartella di prima (anche quelli del codice del
+    # gioco, che restano sul PC) servono alle reinstallazioni, che cosi' ricompilano solo quello che e' cambiato
+    vc = vecchia / 'cache' / 'compilatore'
+    if vc.is_dir() and vc.resolve() != CACHE_COMPILATORE.resolve():
+        n, gia = sposta_cache_compilatore(vc, CACHE_COMPILATORE, prova)
+        if n or gia:
+            log(T(f'  cache del compilatore: {n} file presi' + (f', {gia} c\'erano gia\'' if gia else ''),
+                  f'  compiler cache: {n} files taken' + (f', {gia} were already here' if gia else '')))
+            fatti.append(('cache', n))
+    lingua_f = vecchia / 'lingua.txt'
+    if lingua_f.is_file() and not (ROOT / 'lingua.txt').exists():
+        log(T('  lingua: copio lingua.txt', '  language: copying lingua.txt'))
+        if not prova:
+            shutil.copy2(lingua_f, ROOT / 'lingua.txt')
+    if not fatti:
+        log(T('Niente da prendere.', 'Nothing to take.'))
+    else:
+        log(T(f'Fatto: {len(fatti)} cose prese' if not prova else f'Prova: {len(fatti)} cose da prendere',
+              f'Done: {len(fatti)} items taken' if not prova else f'Dry run: {len(fatti)} items to take') +
+            T(f'. La cartella {vecchia} resta: quando hai controllato che tutto funziona puoi cancellarla tu.',
+              f'. The folder {vecchia} stays: once you have checked that everything works you can delete it yourself.'))
     return 0
 
 
@@ -2516,7 +3270,11 @@ def cmd_prepara_registrazione(args) -> int:
         log(T('ERRORE: eseguibile non trovato: rifai "installa --registratore"',
               'ERROR: executable not found: run "install --recorder" again'))
         return 1
-    log(prepara_cache_overlay(exe, cartella / 'game.toml', Path(stato.get('disco') or '')))
+    # 0.12 finale (QA-013): con il registratore il gioco parte con la compilazione al volo spenta: niente da preparare
+    log(T(f'niente da preparare: nelle installazioni con il registratore ({cartella.name}) la compilazione al volo e\' '
+          'spenta quando si gioca, e le partite si rigiocano in modo esatto',
+          f'nothing to prepare: in installations with the recorder ({cartella.name}) compilation on the fly is off '
+          'while playing, and the games replay exactly'))
     return 0
 
 
@@ -2557,7 +3315,7 @@ def cmd_avvia(args) -> int:
               f'ERROR: {prof} is not installed in {cartella}: first use "install"'))
         return 1
     exe = trova_exe(cartella / ('build-dev' if args.debug else 'build-release'))
-    cue = Path(stato.get('disco') or '')
+    cue = disco_installato(prof, cartella, stato)
     if exe is None or not cue.is_file():
         manca = (T('l\'eseguibile', 'the executable') if exe is None else T('il disco ', 'the disc ') + str(cue))
         log(T(f'ERRORE: manca {manca}: rifai "installa"', f'ERROR: {manca} is missing: run "install" again'))
@@ -2570,7 +3328,13 @@ def cmd_avvia(args) -> int:
         if cambiato:
             log(cambiato)
     cmd = [str(exe), '--game', str(cartella / 'game.toml'), '--disc', str(cue)]
-    if not args.con_launcher:
+    if getattr(args, 'nascosta', False):
+        cmd.append('--hidden-window')               # solo per le prove automatiche (con --prova)
+    if args.con_launcher:
+        # 0.12: la finestra di psxrecomp chiesta esplicitamente, cosi' si apre anche se il giocatore l'aveva
+        # nascosta da quella stessa finestra (senza --launcher psxrecomp la salta)
+        cmd.append('--launcher')
+    else:
         cmd.append('--no-launcher')
         try:                         # QA-015: senza la finestra di psxrecomp il controller va scelto da qui
             nota = controller_predefinito(exe.parent / 'settings.toml')
@@ -2580,22 +3344,64 @@ def cmd_avvia(args) -> int:
         if nota:
             log(nota)
     env = dict(os.environ)
+    if stato.get('registratore'):
+        # 0.12 finale (QA-013): nelle installazioni con il registratore la compilazione al volo di psxrecomp e' spenta,
+        # cosi' le partite registrate si rigiocano in modo esatto anche dove il gioco trova codice nuovo (quel pezzo va
+        # con l'interprete, come senza il toolchain degli overlay); rigioca_partite.py fa lo stesso
+        env['PSX_OVERLAY_AUTOCOMPILE_OFF'] = '1'
+        log(T('installazione con il registratore: compilazione al volo spenta, la partita si potra\' rigiocare in modo '
+              'esatto', 'installation with the recorder: compilation on the fly off, the game can be replayed exactly'))
+    scelta_filmati = stato.get('filmati') or ''
+    dir_ia = None
+    if scelta_filmati.startswith('ia-'):            # 0.12: filmati IA del modello scelto, se preparati
+        try:
+            ia = _ia()
+            mod = scelta_filmati[3:]
+            if mod in ia.MODELLI and ia.pronti(cartella, stato, mod):
+                dir_ia = cartella / ia.cartella_filmati(mod)
+            else:
+                log(T(f'avviso: i filmati IA ({mod}) non sono preparati: ' +
+                      ('si usano i Migliorati' if filmati_hd_pronti(cartella, stato) else 'si usa il filtro in tempo reale'),
+                      f'warning: the AI movies ({mod}) are not prepared: ' +
+                      ('using the Enhanced movies' if filmati_hd_pronti(cartella, stato) else 'using the real-time filter')))
+        except Exception as e:  # noqa: BLE001
+            log(T(f'avviso: filmati IA non usabili ({e})', f'warning: AI movies not usable ({e})'))
+    if dir_ia is not None:
+        env['PSX_FMV_HD_DIR'] = str(dir_ia)
+        log(T(f'filmati IA: {dir_ia}', f'AI movies: {dir_ia}'))
+    elif scelta_filmati in ('migliorati',) + FILMATI_IA and filmati_hd_pronti(cartella, stato):
+        env['PSX_FMV_HD_DIR'] = str(cartella / FILMATI_HD)
+        log(T(f'filmati migliorati: {cartella / FILMATI_HD}', f'enhanced movies: {cartella / FILMATI_HD}'))
+    else:
+        env['PSX_FMV_HD_DIR'] = '0'                 # spenti anche se accanto all'eseguibile ci fosse una cartella fmv_hd
+    if _filmati_con_filtro(scelta_filmati):
+        # 0.12: filtro dei filmati nuovo nel motore (blocchi della compressione attenuati, colori interpolati,
+        # ingrandimento che segue i contorni); i motori precedenti non lo conoscono e usano il bicubic.
+        env['PSX_SM2_FILTRO_FILMATI'] = '1'
+    vol = stato.get('volume')
+    if isinstance(vol, int) and 0 <= vol < 100:     # 0.12: volume all'avvio (psxrecomp lo legge da PSX_VOLUME)
+        env['PSX_VOLUME'] = str(vol)
+        log(T(f'volume all\'avvio: {vol}%', f'volume at start: {vol}%'))
     if args.risoluzione:
         env['PSX_INTERNAL_RESOLUTION'] = args.risoluzione
+    pg = leggi_pgxp(cartella)
     if args.pgxp:
+        pg['acceso'] = True
         env['PSX_GEOMETRY_CORRECTION'] = '1'
-        env['PSX_PERSPECTIVE_TEXTURING'] = '1'
-        if not stato.get('pgxp'):
-            log(T('avviso: questa installazione non e\' compilata con --pgxp: PGXP funziona solo in parte',
-                  'warning: this installation is not built with --pgxp: PGXP only works in part'))
+        env['PSX_PERSPECTIVE_TEXTURING'] = '1' if pg['texture'] else '0'
+    env.update(ambiente_pgxp(pg))
+    if pg['acceso'] and not stato.get('pgxp'):
+        log(T('ATTENZIONE: questa installazione non ha i punti di aggancio di PGXP: PGXP e\' acceso ma corregge quasi '
+              'niente. Ricompila con "installa --pgxp" (dalla finestra: Gioca lo propone da solo).',
+              'WARNING: this installation does not have the PGXP hooks: PGXP is on but corrects almost nothing. '
+              'Build it again with "install --pgxp" (in the window, Play offers it by itself).'))
     if args.cpu == 'meta':
         log(limita_cpu_meta())
     nome = nome_versione(prof, cat.get(prof, {}).get('nome', ''))
     log(T(f'avvio di {prof} ({nome}):', f'starting {prof} ({nome}):'), ' '.join(cmd))
     if args.risoluzione:
         log(T(f'risoluzione interna: {args.risoluzione}', f'internal resolution: {args.risoluzione}'))
-    if args.pgxp:
-        log(T('PGXP acceso (geometria e texture piu\' precise)', 'PGXP on (more precise geometry and textures)'))
+    log(descrivi_pgxp(pg))
     uscita = open(cartella / 'gioco_output.txt', 'w', encoding='utf-8', errors='replace')
     if not args.prova:
         flags = 0
@@ -2629,17 +3435,582 @@ def cmd_avvia(args) -> int:
     return 1
 
 
+# ------------------------------------------------------------------------------------ filmati migliorati
+
+# Filmati migliorati (0.12): tools/fmv/fmv_str.c (compilato qui con il clang del toolchain e l'MDEC di psxrecomp) legge i
+# filmati STR dal disco del giocatore, li decodifica con i colori del gioco, attenua i bordi dei blocchi, interpola il
+# colore, ingrandisce (Lanczos) con una nitidezza adattiva al contrasto e scrive un pacchetto fmv_hd di psxrecomp nella
+# cartella dell'installazione. Il gioco lo usa con PSX_FMV_HD_DIR (lo passa "avvia" se i filmati sono "migliorati").
+# Taratura del 4/11/2026 su USA Rev 1: mentre un fotogramma e' a schermo il CD ha consegnato da 22 a 32 settori oltre il
+# suo primo settore, quindi indice con 22 settori di ritardo; nel motore (nostra modifica a gpu_fmv_hd.c) 3 settori di
+# margine e fino a 64 filmati. Niente dati del gioco nel pacchetto: tutto si prepara sul PC dal disco dell'utente.
+# Formato 2 (4/11/2026, sera): nelle versioni europee (quadro largo 328) il filmato sta a sinistra, non al centro; con
+# l'indice "al centro" il 99,2% delle immagini era sostituito invece del 99,9%. Un pacchetto di formato 1 si rifa'.
+# Enhanced movies (0.12): prepared on the player's PC from their own disc into a psxrecomp fmv_hd pack.
+FMV_DIR = TOOLS / 'fmv'
+FILMATI_HD = 'filmati_hd'
+FMV_RITARDO = 22
+FMV_SCALA, FMV_QUALITA = 4, 90
+FMV_FORMATO = 2
+
+
+def elenco_filmati(dati: Path) -> list:
+    """I filmati STR del disco (nome, primo settore, settori), dal file system ISO9660 della traccia dati."""
+    out = []
+    with Immagine(dati) as img:
+        pvd = img.leggi(16, 2048)
+
+        def giro(lba, size, base, livello=0):
+            if livello > 8:
+                return
+            for nome, l, s, d in img.cartella(lba, size):
+                if d:
+                    giro(l, s, base + [nome], livello + 1)
+                elif nome.upper().endswith('.STR'):
+                    out.append((base, nome[:-4].upper(), l, (s + 2047) // 2048))
+        giro(int.from_bytes(pvd[158:162], 'little'), int.from_bytes(pvd[166:170], 'little'), [])
+    nomi = [x[1] for x in out]
+    res = []
+    for base, nome, l, s in sorted(out, key=lambda x: x[2]):
+        if nomi.count(nome) > 1:                    # stesso nome in due cartelle: si aggiunge la cartella
+            nome = '_'.join(base + [nome])
+        res.append((re.sub(r'[^A-Z0-9_]', '_', nome), l, s))
+    return res
+
+
+def strumento_filmati():
+    """tools/fmv/fmv_str.exe, compilato se manca o se i sorgenti sono piu' nuovi; None se non si puo'."""
+    exe = FMV_DIR / ('fmv_str.exe' if os.name == 'nt' else 'fmv_str')
+    sorgenti = [FMV_DIR / 'fmv_str.c', FMV_DIR / 'fmv_jpeg.h', ROOT / 'psxrecomp' / 'runtime' / 'src' / 'mdec.c']
+    if not all(s.is_file() for s in sorgenti):
+        log(T('ERRORE: mancano i sorgenti di tools/fmv o psxrecomp/runtime/src/mdec.c',
+              'ERROR: the tools/fmv sources or psxrecomp/runtime/src/mdec.c are missing'))
+        return None
+    if exe.is_file() and exe.stat().st_mtime >= max(s.stat().st_mtime for s in sorgenti):
+        return exe
+    clang = TOOLCHAIN / 'bin' / ('clang.exe' if os.name == 'nt' else 'clang')
+    cc = str(clang) if clang.is_file() else (shutil.which('clang') or shutil.which('cc'))
+    if not cc:
+        log(T('ERRORE: compilatore non trovato', 'ERROR: compiler not found'))
+        return None
+    cmd = [cc, '-O2', '-I', str(ROOT / 'psxrecomp' / 'runtime' / 'include'), '-o', str(exe), str(sorgenti[0]),
+           str(sorgenti[2])] + ([] if os.name == 'nt' else ['-lm'])
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 or not exe.is_file():
+        log(T('ERRORE: compilazione di fmv_str non riuscita:\n', 'ERROR: fmv_str build failed:\n') +
+            (r.stdout + r.stderr)[-2000:])
+        return None
+    log(T(f'  strumento dei filmati compilato: {exe}', f'  movie tool built: {exe}'))
+    return exe
+
+
+def filmati_hd_pronti(cartella: Path, stato: dict) -> bool:
+    hd = stato.get('filmati_hd') or {}
+    return (bool(hd.get('completo')) and hd.get('formato', 1) == FMV_FORMATO and
+            (cartella / FILMATI_HD / 'liste.txt').is_file())
+
+
+def motore_con_filmati_hd() -> bool:
+    """Il psxrecomp del pacchetto ha la nostra modifica per i filmati migliorati (64 filmati, margine dei settori)?"""
+    try:
+        return 'FMV_LBA_SLACK' in (ROOT / 'psxrecomp' / 'runtime' / 'src' / 'gpu_fmv_hd.c').read_text(
+            encoding='utf-8', errors='replace')
+    except OSError:
+        return False
+
+
+def cmd_prepara_filmati(args) -> int:
+    prof = args.profilo
+    cartella = Path(args.cartella) if args.cartella else GIOCHI / prof
+    cartella = cartella if cartella.is_absolute() else (ROOT / cartella)
+    apri_log(cartella / 'launcher_log.txt')
+    try:
+        stato = json.loads((cartella / 'installazione.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        log(T(f'ERRORE: {prof} non e\' installato in {cartella}: usa prima "installa"',
+              f'ERROR: {prof} is not installed in {cartella}: first use "install"'))
+        return 1
+    log(T(f'EnterElectro-Recomp launcher {VERSIONE} - filmati migliorati di {prof} in {cartella / FILMATI_HD}',
+          f'EnterElectro-Recomp launcher {VERSIONE} - enhanced movies of {prof} in {cartella / FILMATI_HD}'))
+    if not motore_con_filmati_hd():
+        log(T('avviso: il motore di questo pacchetto non ha la modifica per i filmati migliorati: il gioco ne userebbe '
+              'al massimo 16 e mostrerebbe a tratti i fotogrammi originali',
+              'warning: this package\'s engine lacks the enhanced-movie change: the game would use at most 16 movies '
+              'and sometimes show the original frames'))
+    dest, tmp = cartella / FILMATI_HD, cartella / (FILMATI_HD + '.tmp')
+    scala, qualita = args.scala, args.qualita
+    hd = stato.get('filmati_hd') or {}
+    if filmati_hd_pronti(cartella, stato) and not args.rifai:
+        log(T(f'filmati migliorati gia\' pronti ({hd.get("filmati")} filmati, {hd.get("byte", 0) / 1e9:.2f} GB, x{hd.get("scala")}): '
+              'per rifarli usa --rifai', f'enhanced movies already prepared ({hd.get("filmati")} movies, '
+              f'{hd.get("byte", 0) / 1e9:.2f} GB, x{hd.get("scala")}): to redo them use --redo'))
+        return 0
+    try:
+        info = leggi_cue(disco_installato(prof, cartella, stato))
+    except (OSError, ErroreDisco) as e:
+        log(T(f'ERRORE: disco dell\'installazione non leggibile ({e})', f'ERROR: the installation\'s disc cannot be read ({e})'))
+        return 1
+    dati = Path(info['dati'])
+    try:
+        filmati = elenco_filmati(dati)
+    except (OSError, ErroreDisco) as e:
+        log(T(f'ERRORE: file system del disco non leggibile ({e})', f'ERROR: disc file system cannot be read ({e})'))
+        return 1
+    if not filmati:
+        log(T('ERRORE: nessun filmato STR sul disco', 'ERROR: no STR movie on the disc'))
+        return 1
+    settori = sum(s for _, _, s in filmati)
+    stima = settori / 10 * 80_000 * (scala / 4) ** 2 * 1.3
+    libero = shutil.disk_usage(cartella).free
+    log(T(f'{len(filmati)} filmati, {settori} settori (circa {settori // 10} fotogrammi); spazio stimato '
+          f'{stima / 1e9:.1f} GB, libero {libero / 1e9:.1f} GB',
+          f'{len(filmati)} movies, {settori} sectors (about {settori // 10} frames); estimated space '
+          f'{stima / 1e9:.1f} GB, free {libero / 1e9:.1f} GB'))
+    if libero < stima + 1e9:
+        log(T('ERRORE: spazio libero insufficiente', 'ERROR: not enough free space'))
+        return 1
+    log(attiva_toolchain())
+    exe = strumento_filmati()
+    if exe is None:
+        return 1
+    if tmp.exists():
+        shutil.rmtree(tmp, ignore_errors=True)       # resto di una preparazione interrotta: e' solo nostro
+    tmp.mkdir(parents=True)
+    n_proc = args.processi if args.processi > 0 else max(1, (os.cpu_count() or 2) * 3 // 4)
+    log(T(f'preparazione con {n_proc} processi: ingrandimento x{scala}, JPEG qualita\' {qualita}',
+          f'preparing with {n_proc} processes: x{scala} upscale, JPEG quality {qualita}'))
+    t0 = time.time()
+    coda = list(filmati)
+    attivi, fatti, errori = {}, {}, []
+    tot_fot, tot_byte = 0, 0
+    while coda or attivi:
+        while coda and len(attivi) < n_proc:
+            nome, l, s = coda.pop(0)
+            cmd = [str(exe), 'pacchetto', str(dati), str(l), str(s), str(tmp / nome), str(FMV_RITARDO), str(scala),
+                   str(qualita)]
+            attivi[nome] = (subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True), time.time())
+        for nome in list(attivi):
+            pr, ti = attivi[nome]
+            if pr.poll() is None:
+                continue
+            out, err = pr.communicate()
+            del attivi[nome]
+            try:
+                j = json.loads(out.strip().splitlines()[-1])
+            except (ValueError, IndexError):
+                j = {}
+            ok = pr.returncode == 0 and j.get('fotogrammi') and j.get('jpeg') == j.get('fotogrammi')
+            fatti[nome] = j
+            if not ok:
+                errori.append(nome)
+                log(T(f'  ERRORE {nome}: codice {pr.returncode} {(out + err).strip()[-300:]}',
+                      f'  ERROR {nome}: code {pr.returncode} {(out + err).strip()[-300:]}'))
+                continue
+            tot_fot += j['fotogrammi']
+            tot_byte += j.get('byte', 0)
+            log(T(f'  [{len(fatti)}/{len(filmati)}] {nome}: {j["fotogrammi"]} fotogrammi, {j.get("byte", 0) / 1e6:.1f} MB, '
+                  f'{time.time() - ti:.0f} s', f'  [{len(fatti)}/{len(filmati)}] {nome}: {j["fotogrammi"]} frames, '
+                  f'{j.get("byte", 0) / 1e6:.1f} MB, {time.time() - ti:.0f} s'))
+        time.sleep(0.2)
+    if errori:
+        log(T(f'ERRORE: {len(errori)} filmati non preparati ({", ".join(errori)}); i filmati migliorati restano spenti',
+              f'ERROR: {len(errori)} movies not prepared ({", ".join(errori)}); enhanced movies stay off'))
+        return 1
+    (tmp / 'liste.txt').write_text('\n'.join(n for n, _, _ in filmati) + '\n', encoding='utf-8')
+    if dest.exists():
+        vecchia = cartella / f'{FILMATI_HD}.prima_{datetime.datetime.now():%Y%m%d_%H%M%S}'
+        dest.rename(vecchia)
+        log(T(f'filmati migliorati di prima spostati in {vecchia} (si possono cancellare)',
+              f'previous enhanced movies moved to {vecchia} (they can be deleted)'))
+    tmp.rename(dest)
+    stato = json.loads((cartella / 'installazione.json').read_text(encoding='utf-8'))
+    stato['filmati_hd'] = {'completo': True, 'filmati': len(filmati), 'fotogrammi': tot_fot, 'byte': tot_byte,
+                           'scala': scala, 'qualita': qualita, 'ritardo': FMV_RITARDO, 'formato': FMV_FORMATO,
+                           'launcher': VERSIONE,
+                           'secondi': round(time.time() - t0, 1), 'data': f'{datetime.datetime.now():%Y-%m-%d %H:%M:%S}'}
+    (cartella / 'installazione.json').write_text(json.dumps(stato, indent=1, ensure_ascii=False), encoding='utf-8')
+    try:
+        if prepara_sfondo(cartella, rifai=True):
+            log(T('sfondo della finestra del launcher: un fotogramma dei filmati migliorati (sfondo.jpg)',
+                  'launcher window background: a frame of the enhanced movies (sfondo.jpg)'))
+    except OSError:
+        pass
+    log(T(f'Fatto in {time.time() - t0:.0f} s: {len(filmati)} filmati, {tot_fot} fotogrammi, {tot_byte / 1e9:.2f} GB. '
+          'Per usarli: opzioni --filmati migliorati (nella finestra: Filmati "Migliorati").',
+          f'Done in {time.time() - t0:.0f} s: {len(filmati)} movies, {tot_fot} frames, {tot_byte / 1e9:.2f} GB. '
+          'To use them: options --movies enhanced (in the window: Movies "Enhanced").'))
+    return 0
+
+
+# ------------------------------------------------------------------------------------ filmati IA (0.12)
+# Filmati IA (0.12, facoltativi): tre ingranditori a intelligenza artificiale a scelta del giocatore (sm2_ia.py, con la
+# parte di calcolo in sm2_ia_calcolo.py). Programmi e modelli si scaricano solo su richiesta del giocatore in tools/ia/;
+# i filmati si preparano dal disco in giochi/<VERSIONE>/filmati_ia_<modello>/ (formato fmv_hd, come i Migliorati) e il
+# gioco li usa con PSX_FMV_HD_DIR. Dove mancano, valgono i Migliorati o il filtro in tempo reale.
+# AI movies (0.12, optional): three AI upscalers chosen by the player; downloads only on request; see sm2_ia.py.
+MODELLI_IA = ('swin2sr', 'general', 'anime')
+FILMATI_IA = tuple('ia-' + m for m in MODELLI_IA)
+
+
+def _ia():
+    import sm2_ia
+    return sm2_ia
+
+
+def _filmati_con_filtro(v) -> bool:
+    """Scelte dei filmati che, dove i fotogrammi preparati mancano, usano il filtro in tempo reale."""
+    return v in ('filtro', 'migliorati') + FILMATI_IA
+
+
+def _modelli_ia(testo: str) -> list:
+    nomi = [x.strip() for x in (testo or '').split(',') if x.strip()] or list(MODELLI_IA)
+    sbagliati = [x for x in nomi if x not in MODELLI_IA]
+    if sbagliati:
+        raise SystemExit(T(f'modelli sconosciuti: {", ".join(sbagliati)} (validi: {", ".join(MODELLI_IA)})',
+                           f'unknown models: {", ".join(sbagliati)} (valid: {", ".join(MODELLI_IA)})'))
+    return nomi
+
+
+def _installazione_ia(args):
+    """(profilo, cartella, stato) di un'installazione, o None (messaggio gia' scritto)."""
+    prof = args.profilo
+    cartella = Path(args.cartella) if getattr(args, 'cartella', '') else GIOCHI / prof
+    cartella = cartella if cartella.is_absolute() else (ROOT / cartella)
+    apri_log(cartella / 'launcher_log.txt')
+    try:
+        stato = json.loads((cartella / 'installazione.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        log(T(f'ERRORE: {prof} non e\' installato in {cartella}: usa prima "installa"',
+              f'ERROR: {prof} is not installed in {cartella}: first use "install"'))
+        return None
+    return prof, cartella, stato
+
+
+def _disco_e_filmati_ia(prof, cartella, stato):
+    try:
+        dati = Path(leggi_cue(disco_installato(prof, cartella, stato))['dati'])
+        filmati = elenco_filmati(dati)
+    except (OSError, ErroreDisco) as e:
+        log(T(f'ERRORE: disco dell\'installazione non leggibile ({e})', f'ERROR: the installation\'s disc cannot be read ({e})'))
+        return None
+    if not filmati:
+        log(T('ERRORE: nessun filmato STR sul disco', 'ERROR: no STR movie on the disc'))
+        return None
+    return dati, filmati
+
+
+def cmd_ia_scarica(args) -> int:
+    ia = _ia()
+    modelli = _modelli_ia(args.modelli)
+    apri_log(GIOCHI / 'launcher_log.txt')
+    serve = ia.da_scaricare(ROOT, modelli)
+    if ia.programmi_pronti(ROOT) and all(ia.modello_pronto(ROOT, n) for n in modelli):
+        log(T('programmi e modelli IA gia\' pronti in tools/ia', 'AI programs and models already ready in tools/ia'))
+        return 0
+    if not serve:          # tutto gia' presente: solo controlli (SHA-256) e conversione, senza rete
+        log(T('Filmati IA: niente da scaricare, controllo e preparo i modelli presenti in tools/ia',
+              'AI movies: nothing to download, checking and preparing the models present in tools/ia'))
+        return 0 if ia.installa(ROOT, modelli, log, T, scarica=False) else 1
+    log(T('Filmati IA: da scaricare (una volta sola, in tools/ia):', 'AI movies: to download (only once, into tools/ia):'))
+    for cosa, byte in serve:
+        log(f'  {cosa}: {byte / 1e6:.1f} MB')
+    log(T(f'  totale circa {sum(b for _, b in serve) / 1e6:.0f} MB, da pypi.org, huggingface.co e github.com',
+          f'  about {sum(b for _, b in serve) / 1e6:.0f} MB in total, from pypi.org, huggingface.co and github.com'))
+    for n in modelli:
+        log(f'  {ia.MODELLI[n]["nome"]}: ' + T('licenza ', 'licence ') + ia.MODELLI[n]['licenza'])
+    if not args.si:
+        log(T('Niente scaricato: per scaricare aggiungi --si.', 'Nothing downloaded: to download add --yes.'))
+        return 2
+    return 0 if ia.installa(ROOT, modelli, log, T, scarica=True) else 1
+
+
+def cmd_prepara_filmati_ia(args) -> int:
+    r = _installazione_ia(args)
+    if r is None:
+        return 1
+    prof, cartella, stato = r
+    ia = _ia()
+    mod = args.modello
+    m = ia.MODELLI[mod]
+    log(T(f'EnterElectro-Recomp launcher {VERSIONE} - filmati IA di {prof} con {m["nome"]} in '
+          f'{cartella / ia.cartella_filmati(mod)}',
+          f'EnterElectro-Recomp launcher {VERSIONE} - AI movies of {prof} with {m["nome"]} in {cartella / ia.cartella_filmati(mod)}'))
+    if not (ia.programmi_pronti(ROOT) and ia.modello_pronto(ROOT, mod)):
+        log(T(f'ERRORE: mancano i programmi o il modello: prima "ia-scarica --modelli {mod} --si"',
+              f'ERROR: the programs or the model are missing: first "ai-download --models {mod} --yes"'))
+        return 1
+    if ia.pronti(cartella, stato, mod) and not args.rifai:
+        log(T('filmati IA gia\' pronti: per rifarli usa --rifai', 'AI movies already prepared: to redo them use --redo'))
+        return 0
+    r = _disco_e_filmati_ia(prof, cartella, stato)
+    if r is None:
+        return 1
+    dati, filmati = r
+    settori = sum(s for _, _, s in filmati)
+    stima = settori / 10 * 95_000 * 1.2
+    libero = shutil.disk_usage(cartella).free
+    log(T(f'{len(filmati)} filmati, circa {settori // 10} fotogrammi; spazio stimato {stima / 1e9:.1f} GB, libero '
+          f'{libero / 1e9:.1f} GB', f'{len(filmati)} movies, about {settori // 10} frames; estimated space '
+          f'{stima / 1e9:.1f} GB, free {libero / 1e9:.1f} GB'))
+    if libero < stima + 1e9:
+        log(T('ERRORE: spazio libero insufficiente', 'ERROR: not enough free space'))
+        return 1
+    log(attiva_toolchain())
+    exe = strumento_filmati()
+    if exe is None:
+        return 1
+    return ia.prepara(ROOT, exe, dati, filmati, cartella, mod, FMV_RITARDO, log, T, rifai=args.rifai,
+                      peso=args.stabilizza, processi=args.processi)
+
+
+def cmd_anteprime_ia(args) -> int:
+    r = _installazione_ia(args)
+    if r is None:
+        return 1
+    prof, cartella, stato = r
+    ia = _ia()
+    modelli = [m for m in MODELLI_IA if ia.modello_pronto(ROOT, m)] if ia.programmi_pronti(ROOT) else []
+    if not modelli:
+        log(T('ERRORE: nessun modello IA pronto: prima "ia-scarica --si"', 'ERROR: no AI model ready: first "ai-download --yes"'))
+        return 1
+    r = _disco_e_filmati_ia(prof, cartella, stato)
+    if r is None:
+        return 1
+    dati, filmati = r
+    log(attiva_toolchain())
+    exe = strumento_filmati()
+    if exe is None:
+        return 1
+    mig = (cartella / FILMATI_HD) if filmati_hd_pronti(cartella, stato) else None
+    ia.anteprime(ROOT, exe, dati, filmati, cartella, modelli, mig, log, T, FMV_RITARDO)
+    log(T(f'immagini di prova in {cartella / "anteprime_ia"}', f'test pictures in {cartella / "anteprime_ia"}'))
+    return 0
+
+
+# Sfondo della finestra del launcher (0.12, piano: "Sfondi del launcher"): un fotogramma dei filmati migliorati, fatti
+# dal disco del giocatore, copiato in giochi/<PROFILO>/sfondo.jpg; la finestra lo ritaglia e lo scurisce per la sua
+# larghezza con tools/fmv/fmv_str (comando "sfondo"). Senza filmati migliorati la finestra resta senza immagine.
+SFONDO = 'sfondo.jpg'
+# filmato e fotogramma, in ordine di preferenza (scelti il 5/11/2026: palazzi di notte con le finestre accese, poi la
+# citta' dall'alto, poi Spider-Man sull'impalcatura); se non ce n'e' nessuno, quello a meta' del primo filmato che c'e'
+SFONDO_FOTOGRAMMI = (('E1M0', 690), ('E1M0', 30), ('HELLO', 140))
+SFONDO_FOTOGRAMMA = SFONDO_FOTOGRAMMI[0]
+
+
+def prepara_sfondo(cartella: Path, rifai: bool = False):
+    """Copia il fotogramma dello sfondo dai filmati migliorati dell'installazione; restituisce il file o None."""
+    dest = cartella / SFONDO
+    if dest.is_file() and not rifai:
+        return dest
+    hd = cartella / FILMATI_HD
+    src = next((hd / film / 'frames' / f'{n:06d}.jpg' for film, n in SFONDO_FOTOGRAMMI
+                if (hd / film / 'frames' / f'{n:06d}.jpg').is_file()), None)
+    if src is None:
+        for film in [f for f, _ in SFONDO_FOTOGRAMMI]:
+            fr = sorted((hd / film / 'frames').glob('*.jpg')) if (hd / film / 'frames').is_dir() else []
+            if fr:
+                src = fr[len(fr) // 2]
+                break
+    if src is None:
+        return None
+    tmp = dest.with_name(SFONDO + '.tmp')
+    shutil.copy2(src, tmp)
+    tmp.replace(dest)
+    return dest
+
+
 # -------------------------------------------------------------------------------------------- opzioni
 
 # Mod incluse in psxrecomp (psxrecomp/mods/builtin/packages): pacchetto, funzione.
 MOD_RISOLUZIONE = ('psx.enhancement.internal-resolution', 'internal-resolution')
 MOD_PGXP = ('psx.enhancement.pgxp', 'pgxp')
 MOD_FILTRI = ('psx.enhancement.image-filtering', 'image-filtering')
+# Filmati (0.12): il "filtro in tempo reale" usa il filtro dei filmati della mod Image Filtering di psxrecomp e la
+# pulizia dei colori del game.toml ([video] fmv_chroma_smoothing). I filmati di Spider-Man 2 sono a 24 bit (misurato
+# il 4/11/2026 con mdec_state in tutte le versioni provate), quindi tutti e due valgono; solo con OpenGL.
+# Bicubic: nel confronto del 4/11/2026 (USA Rev 1, 1280x960, frame 1800) toglie il 93% degli scalini senza perdere
+# nitidezza; bilinear sfoca (-9%), sharp ne toglie solo il 37%.
+# Dalla 0.12 il motore (patch_psxrecomp_012.py, punto 6) con PSX_SM2_FILTRO_FILMATI=1, passata da "avvia", usa al
+# posto del bicubic un filtro nuovo: blocchi della compressione attenuati e colore interpolato sul processore,
+# ingrandimento che segue i contorni con un po' di nitidezza nella scheda video. Il bicubic resta la base (e vale
+# con i motori precedenti).
+# Movies (0.12): the real-time filter uses the Image Filtering FMV filter plus game.toml fmv_chroma_smoothing;
+# from 0.12 the engine replaces bicubic with its new movie filter when "avvia" passes PSX_SM2_FILTRO_FILMATI=1.
+FILTRO_FILMATI = 'bicubic'
 MOD_CRT = ('psx.enhancement.crt-filter', 'crt-filter')
 MOD_AUDIO = ('psx.enhancement.enhanced-audio', 'enhanced-audio')
 MOD_WIDESCREEN = ('sm2.enhancement.widescreen', 'widescreen')       # nostra, in mods/preloaded/
+# valori di --widescreen diversi da quelli del pacchetto (0.12: «Adatta alla finestra», scelta "fit")
+ASPETTO_WIDESCREEN = {'adatta': 'fit'}
 MOD_DISTANZA = ('sm2.enhancement.draw-distance', 'draw-distance')    # nostra, solo dove ci sono gli indirizzi
 MOD_SUDDIVISI = ('sm2.enhancement.draw-distance', 'subdivision-precision')   # con PGXP
+
+# PGXP come in DuckStation (0.12; richiesta dell'utente del 6/11/2026: "integra il PGXP funzionante con tutte le
+# funzioni e migliorie esatte come su duckstation e deve funzionare davvero"). Le voci di DuckStation (Impostazioni >
+# Grafica > PGXP) con gli stessi valori di partenza quando PGXP si accende; il motore (psxrecomp) le ha tutte
+# (runtime/include/pgxp.h, gpu_gl_renderer.c, docs G1.9-G1.14). Dove stanno:
+#  - PGXP (correzione della geometria): la mod psx.enhancement.pgxp in mods/state.toml, che accende geometria e
+#    texture; le sue opzioni cpu_mode (modalita' CPU) e culling (correzione del culling);
+#  - le altre nella sezione [video] del game.toml, che il gioco legge all'avvio (scritte con i valori che valgono:
+#    con PGXP spento sono tutte spente, cosi' niente resta acceso a meta');
+#  - le scelte del giocatore in installazione.json ("pgxp_opzioni"), cosi' restano anche con PGXP spento;
+#  - "avvia" passa PSX_PERSPECTIVE_TEXTURING=0 solo se il giocatore spegne le texture in prospettiva: la mod le
+#    accende sempre insieme alla geometria e la variabile vale su tutto.
+# PGXP funziona davvero solo con l'eseguibile con i punti di aggancio (installa --pgxp): in Spider-Man 2 le coordinate
+# passano dai registri del processore e senza i punti di aggancio PGXP non le segue (lavori 56, 57 e 61 del
+# 5-6/11/2026). Per questo "Gioca" con PGXP acceso su un'installazione senza punti di aggancio la ricompila (la finestra
+# lo chiede) e "opzioni" e "avvia" lo dicono chiaramente. Solo con OpenGL; con Vulkan geometria e texture, con il
+# disegno software niente (disegna come la PlayStation).
+# Valori di partenza: quelli che DuckStation usa per Spider-Man 2 (6/11/2026 pomeriggio). Il suo database dei giochi
+# (data/resources/gamedb.yaml, letto da GitHub il 6/11/2026) per tutte e cinque le versioni ha "ForcePGXPCPUMode"
+# ("Reduces jitter slightly") e "gpuPGXPTolerance: 3" ("Fixes glitch polygons due to sign bit flip and lightning
+# effects"), e DuckStation li applica da solo (game_database.cpp: con CPU Mode su Automatico, il suo valore di partenza,
+# la modalita' CPU si accende insieme a PGXP). Tutte le altre voci come le impostazioni di partenza di DuckStation
+# (settings.cpp). Misura del 6/11/2026 (lavoro 62): con la modalita' CPU i triangoli con tutti i vertici precisi passano
+# dal 72% all'83%, con circa il 10% di lavoro in piu' per frame.
+PGXP_VOCI = (   # chiave, valore di partenza come DuckStation per Spider-Man 2, chiave [video] del game.toml (None:
+    #              opzione della mod o variabile per "avvia", vedi sotto)
+    ('texture', True, 'perspective_texturing'),
+    ('colori', False, 'pgxp_color_correction'),
+    ('culling', True, None),
+    ('proiezione', False, 'pgxp_preserve_projection'),
+    ('cpu', True, None),            # DuckStation per Spider-Man 2: ForcePGXPCPUMode (di solito spenta)
+    ('cache', False, 'pgxp_position_fallback'),
+    ('profondita', False, 'pgxp_depth_buffer'),
+    ('no2d', False, None),
+    ('trasparenti', False, None),
+)
+PGXP_MOD_OPZIONI = {'cpu': 'cpu_mode', 'culling': 'culling'}
+# Le due voci di DuckStation che psxrecomp non aveva (6/11/2026; punto 7 di patch_psxrecomp_012.py): "Disable on 2D
+# Polygons" e "Depth Test Transparent Polygons" (questa solo con il buffer di profondita'). Le passa "avvia" con una
+# variabile al motore.
+PGXP_VARIABILI = {'no2d': 'PSX_PGXP_DISABLE_2D', 'trasparenti': 'PSX_PGXP_TRANSPARENT_DEPTH'}
+# Voci che valgono solo con un'altra accesa, come in DuckStation (6/11/2026 notte): la profondita' di un poligono
+# ("valid_w") parte dalle texture in prospettiva, quindi senza texture in prospettiva niente colori in prospettiva (la
+# finestra di DuckStation spegne la casella) e niente buffer di profondita'; la profondita' dei semitrasparenti vale
+# solo con il buffer di profondita'. Il launcher scrive e descrive solo le voci che valgono davvero (pgxp_vale).
+PGXP_DIPENDE = {'colori': 'texture', 'profondita': 'texture', 'trasparenti': 'profondita'}
+PGXP_TOLLERANZA = 3.0           # DuckStation per Spider-Man 2: gpuPGXPTolerance 3 (di solito -1, nessun limite)
+PGXP_SOGLIA = 4096.0            # soglia di pulizia della profondita' di psxrecomp (unita' SZ della PS1; 0 = mai)
+PGXP_FESSURE = {'no': 'off', 'fine': 'fine', 'largo': 'wide'}     # in piu' di DuckStation (psxrecomp G1.14)
+# Le ultime due voci di DuckStation (6/11/2026 pomeriggio, punto 8 di patch_psxrecomp_012.py), passate da "avvia" al
+# motore con una variabile. "Depth Bias" (PGXPDepthBias): di quanti milionesimi della profondita' ogni poligono va verso
+# la telecamera rispetto a quelli disegnati prima, solo con il buffer di profondita' (di partenza 1, da 0 a 1000 come
+# nella finestra di DuckStation). "Normalize Depth Scale" (PGXPNormalizeDepth): la profondita' di ogni vertice divisa
+# per la scala della trasformazione del suo oggetto; "automatico" come DuckStation (il suo database dei giochi non la
+# accende per Spider-Man 2: spenta), "no", "profondita" (solo con il buffer di profondita') o "sempre" (anche le
+# texture in prospettiva). Spider-Man 2 scala le trasformazioni degli oggetti in 34 livelli su 44 (misurato il
+# 6/11/2026). PGXP sulle linee non ha una voce: come in DuckStation vale sempre con PGXP acceso.
+PGXP_BIAS = 1.0
+PGXP_NORMALIZZA = {'automatico': '0', 'no': '0', 'profondita': '1', 'sempre': '2'}
+PGXP_NORMALIZZA_NOMI = {'automatico': ('automatica (spenta per Spider-Man 2)', 'automatic (off for Spider-Man 2)'),
+                        'no': ('spenta', 'disabled'),
+                        'profondita': ('solo con il buffer di profondita\'', 'depth buffer only'),
+                        'sempre': ('sempre, anche le texture in prospettiva', 'always, texture correction too')}
+PGXP_NORMALIZZA_INGLESE = {'automatic': 'automatico', 'disabled': 'no', 'off': 'no', 'depth-buffer': 'profondita',
+                           'always': 'sempre'}
+PGXP_NOMI = {'texture': ('texture in prospettiva', 'perspective-correct textures'),
+             'colori': ('colori in prospettiva', 'perspective-correct colours'),
+             'culling': ('correzione del culling', 'culling correction'),
+             'proiezione': ('precisione della proiezione', 'preserve projection precision'),
+             'cpu': ('modalita\' CPU', 'CPU mode'),
+             'cache': ('cache dei vertici', 'vertex cache'),
+             'profondita': ('buffer di profondita\'', 'depth buffer'),
+             'no2d': ('niente PGXP sui poligoni 2D', 'disable on 2D polygons'),
+             'trasparenti': ('profondita\' anche per i semitrasparenti', 'depth test transparent polygons')}
+
+
+def pgxp_predefiniti() -> dict:
+    """Le scelte PGXP di partenza: PGXP spento; acceso, come DuckStation per Spider-Man 2."""
+    s = {k: v for k, v, _c in PGXP_VOCI}
+    s.update(acceso=False, tolleranza=PGXP_TOLLERANZA, soglia=PGXP_SOGLIA, fessure='no', bias=PGXP_BIAS,
+             normalizza='automatico')
+    return s
+
+
+def leggi_pgxp(cartella: Path) -> dict:
+    """Le scelte PGXP di un'installazione: acceso o spento dalla mod (build-release, altrimenti build-dev: si puo'
+    cambiare anche dal menu del gioco), il resto da installazione.json (pgxp_opzioni); quello che manca come in
+    DuckStation."""
+    s = pgxp_predefiniti()
+    try:
+        salvate = json.loads((cartella / 'installazione.json').read_text(encoding='utf-8')).get('pgxp_opzioni')
+    except (OSError, ValueError):
+        salvate = None
+    if isinstance(salvate, dict):
+        for k, v in salvate.items():
+            if k in s and k != 'acceso' and type(v) is type(s[k]):
+                s[k] = v
+    for d in (cartella / 'build-release', cartella / 'build-dev'):
+        path = d / 'mods' / 'state.toml'
+        if not path.is_file():
+            continue
+        try:
+            stato = leggi_stato_mod(path)
+        except (OSError, ValueError):
+            break
+        voce = next((f for f in stato['feature'] if (f.get('package_id'), f.get('id')) == MOD_PGXP), None)
+        if voce is not None:
+            s['acceso'] = bool(voce.get('enabled'))
+        break
+    return s
+
+
+def pgxp_vale(s: dict, k: str) -> bool:
+    """La voce k vale davvero: accesa e con accese le voci da cui dipende (PGXP_DIPENDE), come in DuckStation."""
+    while k:
+        if not s.get(k):
+            return False
+        k = PGXP_DIPENDE.get(k)
+    return True
+
+
+def scrivi_pgxp_toml(toml: Path, s: dict) -> list:
+    """Le chiavi PGXP della sezione [video] del game.toml, con i valori che valgono (tutte spente con PGXP spento).
+    Restituisce le righe cambiate."""
+    on = bool(s['acceso'])
+    righe = []
+    for k, _v, chiave in PGXP_VOCI:
+        if chiave:
+            righe.append(imposta_chiave_toml(toml, 'video', chiave, on and pgxp_vale(s, k)))
+    righe.append(imposta_chiave_toml(toml, 'video', 'pgxp_tolerance', float(s['tolleranza'])))
+    righe.append(imposta_chiave_toml(toml, 'video', 'pgxp_depth_threshold', float(s['soglia'])))
+    righe.append(imposta_chiave_toml(toml, 'video', 'pgxp_seam', PGXP_FESSURE[s['fessure']] if on else 'off'))
+    return [r for r in righe if r]
+
+
+def descrivi_pgxp(s: dict) -> str:
+    if not s['acceso']:
+        return T('PGXP spento', 'PGXP off')
+    accese = [T(*PGXP_NOMI[k]) for k, _v, _c in PGXP_VOCI if pgxp_vale(s, k)]
+    tol = (T('tolleranza nessuna', 'tolerance none') if s['tolleranza'] < 0 else
+           T(f'tolleranza {s["tolleranza"]:g} px', f'tolerance {s["tolleranza"]:g} px'))
+    extra = [] if s['fessure'] == 'no' else [T(f'fessure: {s["fessure"]}', f'seams: {PGXP_FESSURE[s["fessure"]]}')]
+    if pgxp_vale(s, 'profondita'):
+        extra.append(T(f'soglia della profondita\' {s["soglia"]:g}', f'depth threshold {s["soglia"]:g}'))
+        b = float(s.get('bias', PGXP_BIAS))
+        extra.append(T(f'depth bias {b:g}', f'depth bias {b:g}'))
+    if s.get('normalizza') in ('profondita', 'sempre'):
+        n_it, n_en = PGXP_NORMALIZZA_NOMI[s['normalizza']]
+        extra.append(T('normalizzazione della profondita\': ' + n_it, 'depth normalization: ' + n_en))
+    return T('PGXP acceso: geometria', 'PGXP on: geometry') + ''.join(', ' + x for x in accese + [tol] + extra)
+
+
+def ambiente_pgxp(s: dict) -> dict:
+    """Variabili per "avvia" con PGXP acceso: le texture in prospettiva spente (la mod le accende sempre) e le voci di
+    DuckStation passate al motore con una variabile, se valgono ("Depth Test Transparent Polygons" e "Depth Bias" solo
+    con il buffer di profondita', vedi PGXP_DIPENDE; "Normalize Depth Scale" se non e' automatica o spenta)."""
+    if not s['acceso']:
+        return {}
+    env = {} if s['texture'] else {'PSX_PERSPECTIVE_TEXTURING': '0'}
+    for k, var in PGXP_VARIABILI.items():
+        if pgxp_vale(s, k):
+            env[var] = '1'
+    if pgxp_vale(s, 'profondita'):
+        env['PSX_PGXP_DEPTH_BIAS'] = f'{max(0.0, float(s.get("bias", PGXP_BIAS))):g}'
+    if s.get('normalizza') in ('profondita', 'sempre'):
+        env['PSX_PGXP_NORMALIZE_DEPTH'] = PGXP_NORMALIZZA[s['normalizza']]
+    return env
 
 # Schermo e presentazione (31/10/2026): non sono mod ma impostazioni di psxrecomp, nella sezione [video] di settings.toml
 # accanto all'eseguibile, lo stesso file che legge e scrive la finestra delle impostazioni di psxrecomp
@@ -2861,6 +4232,11 @@ def cmd_opzioni(args) -> int:
         log(T(f'ERRORE: {prof} non e\' installato in {cartella}: usa prima "installa"',
               f'ERROR: {prof} is not installed in {cartella}: first use "install"'))
         return 1
+    volume = getattr(args, 'volume', -1)
+    if volume != -1 and not 0 <= volume <= 100:
+        log(T(f'ERRORE: volume {volume} non valido (da 0 a 100): niente cambiato',
+              f'ERROR: volume {volume} is not valid (0 to 100): nothing changed'))
+        return 1
     ha_distanza = (cartella / 'mods' / 'preloaded' / 'packages' / MOD_DISTANZA[0]).is_dir()
     ha_widescreen = (cartella / 'mods' / 'preloaded' / 'packages' / MOD_WIDESCREEN[0]).is_dir()
     if args.widescreen and args.widescreen != 'no' and not ha_widescreen:
@@ -2937,9 +4313,65 @@ def cmd_opzioni(args) -> int:
                 cambiato = T(f'avviso: game.toml non aggiornato ({e})', f'warning: game.toml not updated ({e})')
             if cambiato:
                 log(cambiato)
+    if args.filmati:
+        try:
+            cambiato = imposta_chiave_toml(cartella / 'game.toml', 'video', 'fmv_chroma_smoothing',
+                                           _filmati_con_filtro(args.filmati))
+        except OSError as e:
+            cambiato = T(f'avviso: game.toml non aggiornato ({e})', f'warning: game.toml not updated ({e})')
+        log(T('filmati: ' + {'filtro': 'filtro in tempo reale (blocchi della compressione attenuati, colori piu\' '
+                                       'puliti, ingrandimento che segue i contorni; solo OpenGL)',
+                             'migliorati': 'migliorati (preparati dal disco; dove mancano, filtro in tempo reale)',
+                             **{f: f'IA {f[3:]} (preparati dal disco; dove mancano, Migliorati o filtro in tempo reale)'
+                                for f in FILMATI_IA}}.get(args.filmati, 'originali'),
+              'movies: ' + {'filtro': 'real-time filter (compression blocks softened, cleaner colours, upscaling '
+                                      'that follows the edges; OpenGL only)',
+                            'migliorati': 'enhanced (prepared from the disc; where missing, real-time filter)',
+                            **{f: f'AI {f[3:]} (prepared from the disc; where missing, Enhanced or real-time filter)'
+                               for f in FILMATI_IA}}.get(args.filmati, 'original')) + (f' - {cambiato}' if cambiato else ''))
+        if _filmati_con_filtro(args.filmati) and dirs and not exe_contiene(trova_exe(dirs[0]),
+                                                                         b'PSX_SM2_FILTRO_FILMATI'):
+            log(T('nota: questa installazione e\' di una versione precedente: il filtro in tempo reale e\' quello '
+                  f'di prima ({FILTRO_FILMATI}); per quello nuovo reinstalla (i salvataggi restano)',
+                  'note: this installation is from an earlier version: the real-time filter is the previous one '
+                  f'({FILTRO_FILMATI}); for the new one install again (the saves stay)'))
+        try:
+            inst = json.loads((cartella / 'installazione.json').read_text(encoding='utf-8'))
+            inst['filmati'] = args.filmati
+            (cartella / 'installazione.json').write_text(json.dumps(inst, indent=1, ensure_ascii=False), encoding='utf-8')
+        except (OSError, ValueError):
+            inst = {}
+        if args.filmati in FILMATI_IA and not _ia().pronti(cartella, inst, args.filmati[3:]):
+            log(T('avviso: i filmati IA di questo modello non sono ancora preparati (prepara-filmati-ia); intanto '
+                  'valgono i Migliorati o il filtro in tempo reale',
+                  'warning: the AI movies of this model are not prepared yet (prepare-ai-movies); meanwhile the '
+                  'Enhanced movies or the real-time filter are used'))
+        if args.filmati == 'migliorati' and not filmati_hd_pronti(cartella, inst):
+            log(T('avviso: i filmati migliorati non sono ancora preparati: per ora c\'e\' il filtro in tempo reale '
+                  '(prepara-filmati, nella finestra "Prepara filmati migliorati")',
+                  'warning: the enhanced movies are not prepared yet: for now the real-time filter is used '
+                  '(prepare-movies, in the window "Prepare enhanced movies")'))
+    if volume >= 0:
+        # 0.12: volume all'avvio, in installazione.json; "avvia" lo passa al gioco con PSX_VOLUME (psxrecomp della 0.12)
+        try:
+            inst = json.loads((cartella / 'installazione.json').read_text(encoding='utf-8'))
+            inst['volume'] = volume
+            (cartella / 'installazione.json').write_text(json.dumps(inst, indent=1, ensure_ascii=False),
+                                                         encoding='utf-8')
+        except (OSError, ValueError) as e:
+            log(T(f'avviso: volume non salvato ({e})', f'warning: volume not saved ({e})'))
+        else:
+            nota = ''
+            if volume < 100 and not exe_contiene(trova_exe(dirs[0]), b'PSX_VOLUME'):
+                nota = T(' - questa installazione e\' di una versione precedente: per il volume all\'avvio reinstalla '
+                         '(i salvataggi restano)', ' - this installation is from an earlier version: for the volume '
+                         'at start install again (the saves stay)')
+            log(T(f'volume all\'avvio: {volume}% (nel gioco lo cambiano + e - del tastierino)',
+                  f'volume at start: {volume}% (in the game the keypad + and - change it)') + nota)
     acceso = attese_accese(cartella / 'game.toml')
     log(T(f'salto delle attese: {"acceso" if acceso else "spento"} (game.toml)',
           f'idle skip: {"on" if acceso else "off"} (game.toml)'))
+    pg, cambia_pgxp = scelte_pgxp_da_argomenti(args, cartella)
     for d in dirs:
         path = d / 'mods' / 'state.toml'
         try:
@@ -2950,21 +4382,29 @@ def cmd_opzioni(args) -> int:
         if args.risoluzione:
             imposta_mod(stato, MOD_RISOLUZIONE, args.risoluzione != 'gioco',
                         None if args.risoluzione == 'gioco' else {'resolution': args.risoluzione})
-        if args.pgxp:
-            imposta_mod(stato, MOD_PGXP, args.pgxp == 'si')
+        if cambia_pgxp:
+            imposta_mod(stato, MOD_PGXP, pg['acceso'],
+                        {opz: 'true' if pg[k] else 'false' for k, opz in PGXP_MOD_OPZIONI.items()})
             if ha_distanza:                  # PGXP anche per i poligoni suddivisi dal gioco
-                imposta_mod(stato, MOD_SUDDIVISI, args.pgxp == 'si')
+                imposta_mod(stato, MOD_SUDDIVISI, pg['acceso'])
         if args.distanza and ha_distanza:
             imposta_mod(stato, MOD_DISTANZA, args.distanza == 'si')
-        if args.filtro_texture or args.scaling:
+        if args.filtro_texture or args.scaling or args.filmati:
             vals = {}
             if args.filtro_texture:
                 vals['texture_filtering'] = 'default' if args.filtro_texture == 'gioco' else args.filtro_texture
             if args.scaling:
                 vals['smoothing'] = 'default' if args.scaling == 'gioco' else args.scaling
+            if args.filmati:
+                vals['fmv_filtering'] = FILTRO_FILMATI if _filmati_con_filtro(args.filmati) else 'default'
             voce = next((f for f in stato['feature'] if (f.get('package_id'), f.get('id')) == MOD_FILTRI), {})
             tutti = dict(voce.get('values') or {}, **vals)
             imposta_mod(stato, MOD_FILTRI, any(v != 'default' for v in tutti.values()), vals)
+            if _filmati_con_filtro(args.filmati) and tutti.get('smoothing') == 'sharp' and d == dirs[0]:
+                log(T('avviso: con lo scaling "sharp" i filmati restano a blocchi: il filtro dei filmati vale con lo '
+                      'scaling "smooth" o "come il gioco"',
+                      'warning: with "sharp" scaling the movies stay blocky: the movie filter works with "smooth" or '
+                      '"as in the game" scaling'))
         if args.crt:
             imposta_mod(stato, MOD_CRT, args.crt == 'si')
         if args.audio_hq:
@@ -2972,9 +4412,10 @@ def cmd_opzioni(args) -> int:
         usa_widescreen = args.widescreen and (ha_widescreen or args.widescreen == 'no')
         if usa_widescreen:
             imposta_mod(stato, MOD_WIDESCREEN, args.widescreen != 'no',
-                        None if args.widescreen == 'no' else {'aspect': args.widescreen})
-        cambia = any((args.risoluzione, args.pgxp, args.filtro_texture, args.scaling, args.crt, args.audio_hq,
-                      usa_widescreen, args.distanza and ha_distanza))
+                        None if args.widescreen == 'no' else
+                        {'aspect': ASPETTO_WIDESCREEN.get(args.widescreen, args.widescreen)})
+        cambia = any((args.risoluzione, cambia_pgxp, args.filtro_texture, args.scaling, args.crt, args.audio_hq,
+                      usa_widescreen, args.distanza and ha_distanza, args.filmati))
         if cambia:
             scrivi_stato_mod(path, stato)
         log(f'{d.name}\\mods\\state.toml' + (T(' aggiornato:', ' updated:') if cambia else ':'))
@@ -3017,6 +4458,284 @@ def cmd_opzioni(args) -> int:
                 return 1
         log(f'{d.name}\\settings.toml' + (T(' aggiornato: ', ' updated: ') if video else ': ') +
             descrivi_video(leggi_video(d / 'settings.toml')))
+    if cambia_pgxp and not salva_pgxp(cartella, pg):
+        return 1
+    return opzioni_comandi(args, dirs)
+
+
+def scelte_pgxp_da_argomenti(args, cartella: Path) -> tuple:
+    """Le scelte PGXP salvate con sopra quelle della riga di comando; e se la riga di comando ne cambia qualcuna."""
+    s = leggi_pgxp(cartella)
+    cambia = False
+    if args.pgxp:
+        s['acceso'], cambia = args.pgxp == 'si', True
+    for k, _v, _c in PGXP_VOCI:
+        v = getattr(args, f'pgxp_{k}', None)
+        if v:
+            s[k], cambia = v == 'si', True
+    if getattr(args, 'pgxp_tolleranza', None) is not None:
+        s['tolleranza'], cambia = float(args.pgxp_tolleranza), True
+    if getattr(args, 'pgxp_soglia', None) is not None:
+        s['soglia'], cambia = max(0.0, float(args.pgxp_soglia)), True
+    if getattr(args, 'pgxp_fessure', None):
+        s['fessure'], cambia = {'wide': 'largo', 'off': 'no'}.get(args.pgxp_fessure, args.pgxp_fessure), True
+    if getattr(args, 'pgxp_bias', None) is not None:
+        s['bias'], cambia = min(1000.0, max(0.0, float(args.pgxp_bias))), True
+    if getattr(args, 'pgxp_normalizza', None):
+        s['normalizza'], cambia = PGXP_NORMALIZZA_INGLESE.get(args.pgxp_normalizza, args.pgxp_normalizza), True
+    if getattr(args, 'pgxp_predefiniti', False):
+        acceso = s['acceso']
+        s, cambia = pgxp_predefiniti(), True
+        s['acceso'] = acceso
+    return s, cambia
+
+
+def salva_pgxp(cartella: Path, s: dict) -> bool:
+    """Le scelte PGXP nel game.toml (sezione [video]) e in installazione.json; la mod la scrive "opzioni"."""
+    try:
+        for r in scrivi_pgxp_toml(cartella / 'game.toml', s):
+            log('  ' + r)
+    except OSError as e:
+        log(T(f'ERRORE: game.toml non scritto ({e})', f'ERROR: game.toml not written ({e})'))
+        return False
+    try:
+        inst = json.loads((cartella / 'installazione.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        inst = None
+    if isinstance(inst, dict):
+        inst['pgxp_opzioni'] = {k: v for k, v in s.items() if k != 'acceso'}
+        try:
+            (cartella / 'installazione.json').write_text(json.dumps(inst, indent=1, ensure_ascii=False),
+                                                         encoding='utf-8')
+        except OSError as e:
+            log(T(f'avviso: scelte PGXP non salvate in installazione.json ({e})',
+                  f'warning: PGXP choices not saved in installazione.json ({e})'))
+    log(descrivi_pgxp(s))
+    if s['acceso'] and not (isinstance(inst, dict) and inst.get('pgxp')):
+        log(T('ATTENZIONE: questa installazione non ha i punti di aggancio di PGXP: in Spider-Man 2 senza di loro PGXP '
+              'non corregge quasi niente. Ricompila con "installa --pgxp" (dalla finestra: Gioca lo propone da solo); '
+              'salvataggi e opzioni restano.',
+              'WARNING: this installation does not have the PGXP hooks: in Spider-Man 2 PGXP corrects almost nothing '
+              'without them. Build it again with "install --pgxp" (in the window, Play offers it by itself); saves '
+              'and options stay.'))
+    if s['acceso'] and s['profondita']:
+        log(T('nota: il buffer di profondita\' ha bassa compatibilita\' (anche in DuckStation): in Spider-Man 2 '
+              'nasconde per sbaglio pezzi di Spider-Man dietro pavimento e casse (prova del 5/11/2026).',
+              'note: the depth buffer has low compatibility (in DuckStation too): in Spider-Man 2 it wrongly hides '
+              'parts of Spider-Man behind floors and crates (test of 5 Nov 2026).'))
+    return True
+
+
+# ---------------------------------------------------------------------------------------------- comandi
+
+def nome_comando_ps1(chiave: str) -> str:
+    return next((T(it, en) for k, it, en in sm2_comandi.COMANDI if k == chiave), chiave)
+
+
+def descrivi_comandi(conf: dict) -> list:
+    """I comandi del giocatore 1 in parole: controller, modo, zona morta, tasti diversi da quelli del gioco."""
+    c = conf.get('controller', 'auto')
+    chi = (T('il primo collegato', 'the first connected one') if c == 'auto' else
+           T('solo la tastiera', 'keyboard only') if c == 'keyboard' else
+           T('nessuno', 'none') if c == 'none' else c)
+    zona = round(100 * int(conf.get('zona_morta', sm2_comandi.ZONA_MORTA_PREDEFINITA)) / 32767)
+    righe = [T(f'controller: {chi}, {"analogico" if conf.get("modo") == "analog" else "digitale"}, zona morta {zona}%',
+               f'gamepad: {chi}, {conf.get("modo", "analog")}, dead zone {zona}%')]
+    for nome, mappa, pred in ((T('tasti del controller', 'gamepad keys'), sm2_comandi.pad_effettivo(conf),
+                               sm2_comandi.PAD_PREDEFINITI),
+                              (T('tastiera', 'keyboard'), conf.get('tastiera', {}), sm2_comandi.TASTIERA_PREDEFINITI)):
+        diversi = [f'{nome_comando_ps1(k)} = {mappa[k]}' for k in sm2_comandi.CHIAVI
+                   if str(mappa.get(k, pred[k])).replace(' ', '').lower() != pred[k].replace(' ', '').lower()]
+        righe.append(f'{nome}: ' + (T('come il gioco', 'as in the game') if not diversi else
+                                    T('cambiati: ', 'changed: ') + '; '.join(diversi)))
+    return righe
+
+
+def opzioni_comandi(args, dirs: list) -> int:
+    """Controller e tasti del giocatore 1 (0.12): settings.toml [controller], input.ini e keybinds.ini accanto a ogni
+    eseguibile dell'installazione. Senza opzioni dei comandi li descrive soltanto."""
+    conf = sm2_comandi.leggi(dirs[0])
+    conf['pad'] = sm2_comandi.pad_effettivo(conf)
+    cambia = bool(args.controller or args.modo_pad or args.zona_morta >= 0 or args.comandi or args.comandi_predefiniti)
+    if cambia:
+        if args.controller:
+            c = args.controller.strip()
+            if c == 'tastiera':
+                c = 'keyboard'
+            elif c != 'auto':
+                if not sm2_comandi.GUID_RE.match(c):
+                    log(T(f'ERRORE: --controller vuole auto, tastiera o un GUID di 32 cifre esadecimali (non "{c}"): '
+                          'il comando "controller" mostra quelli collegati',
+                          f'ERROR: --controller wants auto, keyboard or a GUID of 32 hex digits (not "{c}"): the '
+                          '"gamepads" command shows the connected ones'))
+                    return 1
+                c = c.lower()
+            conf['controller'] = c
+        if args.modo_pad:
+            conf['modo'] = 'analog' if args.modo_pad == 'analogico' else 'digital'
+        if args.zona_morta >= 0:
+            conf['zona_morta'] = round(min(50, args.zona_morta) * 32767 / 100)
+        if args.comandi_predefiniti:
+            conf['pad'] = dict(sm2_comandi.PAD_PREDEFINITI)
+            conf['tastiera'] = dict(sm2_comandi.TASTIERA_PREDEFINITI)
+        if args.comandi:
+            try:
+                dati = json.loads(Path(args.comandi).read_text(encoding='utf-8'))
+                pad = dict(dati.get('pad') or {})
+                kb = dict(dati.get('tastiera') or dati.get('keyboard') or {})
+            except (OSError, ValueError, AttributeError, TypeError) as e:
+                log(T(f'ERRORE: {args.comandi} non letto ({e})', f'ERROR: {args.comandi} not read ({e})'))
+                return 1
+            sbagliati = [f'pad {k} = {v}' for k, v in pad.items()
+                         if k not in sm2_comandi.CHIAVI or not sm2_comandi.pad_valido(v)]
+            sbagliati += [f'{T("tastiera", "keyboard")} {k} = {v}' for k, v in kb.items()
+                          if k not in sm2_comandi.CHIAVI or not sm2_comandi.tasto_valido(v)]
+            if sbagliati:
+                log(T('ERRORE: valori non validi, niente scritto: ', 'ERROR: invalid values, nothing written: ') +
+                    '; '.join(sbagliati))
+                return 1
+            conf['pad'].update(pad)
+            conf['tastiera'].update(kb)
+        for d in dirs:
+            try:
+                cambiati = sm2_comandi.scrivi(d, conf)
+            except OSError as e:
+                log(T(f'ERRORE: comandi non scritti in {d.name} ({e})', f'ERROR: controls not written in {d.name} ({e})'))
+                return 1
+            log(f'{d.name}: ' + (T('comandi aggiornati (', 'controls updated (') + ', '.join(cambiati) + ')' if cambiati
+                                 else T('comandi gia\' cosi\'', 'controls already like this')))
+    for r in descrivi_comandi(conf):
+        log(r)
+    for v, ks in sm2_comandi.doppioni(conf['pad']).items():
+        log(T(f'avviso: sul controller "{v}" vale per piu\' comandi: ', f'warning: on the gamepad "{v}" is used by more '
+              'than one control: ') + ', '.join(nome_comando_ps1(k) for k in ks))
+    for v, ks in sm2_comandi.doppioni(conf['tastiera'], True).items():
+        log(T(f'avviso: il tasto "{v}" vale per piu\' comandi: ', f'warning: the key "{v}" is used by more than one '
+              'control: ') + ', '.join(nome_comando_ps1(k) for k in ks))
+    for k in sm2_comandi.CHIAVI:
+        for v in str(conf['tastiera'].get(k, '')).split(','):
+            v = v.strip()
+            if v in sm2_comandi.TASTI_DEL_GIOCO:
+                log(T(f'avviso: il tasto "{v}" ({nome_comando_ps1(k)}) lo usa gia\' il gioco ({sm2_comandi.TASTI_DEL_GIOCO[v]})',
+                      f'warning: the key "{v}" ({nome_comando_ps1(k)}) is already used by the game '
+                      f'({sm2_comandi.TASTI_DEL_GIOCO[v]})'))
+    return 0
+
+
+def cmd_controller(args) -> int:
+    """I controller collegati adesso (sm2_pad elenco, con la SDL3 del gioco)."""
+    log(attiva_toolchain())
+    exe = sm2_comandi.strumento_pad(TOOLS, TOOLCHAIN, log, T)
+    if exe is None:
+        return 1
+    try:
+        el = sm2_comandi.elenco_controller(exe)
+    except (OSError, subprocess.SubprocessError) as e:
+        log(T(f'ERRORE: sm2_pad non risponde ({e})', f'ERROR: sm2_pad does not answer ({e})'))
+        return 1
+    if 'errore' in el:
+        log(T(f'ERRORE: {el["errore"]}', f'ERROR: {el["errore"]}'))
+        return 1
+    pads = el.get('pad', [])
+    log(T(f'SDL {el.get("sdl", "?")}: {len(pads)} controller collegati', f'SDL {el.get("sdl", "?")}: {len(pads)} gamepads connected'))
+    for x in pads:
+        log(f'  {x.get("nome")} ({x.get("tipo")}) - GUID {x.get("guid")}')
+    if pads:
+        log(T('per sceglierne uno: opzioni --profilo <PROFILO> --controller <GUID>; "auto" usa il primo collegato',
+              'to choose one: options --profile <PROFILE> --controller <GUID>; "auto" uses the first connected one'))
+    return 0
+
+
+# ---------------------------------------------------------------------------------------------- salvataggi
+
+def cmd_salvataggi(args) -> int:
+    """Memory card e salvataggi rapidi di un'installazione: elenco, copie di sicurezza, ripristino (0.12)."""
+    prof = args.profilo
+    cartella = GIOCHI / prof
+    if not cartella.is_dir():
+        log(T(f'ERRORE: {prof} non e\' installato', f'ERROR: {prof} is not installed'))
+        return 1
+    cards = sm2_salvataggi.percorsi_memory_card(cartella)
+    if getattr(args, 'copia_in', ''):
+        return copia_in_versione(prof, cards[args.card - 1], args.copia_in)
+    if args.copia:
+        for c in cards:
+            d = sm2_salvataggi.copia_di_sicurezza(c)
+            if d:
+                log(T(f'copia di sicurezza di {c.name}: {d}', f'backup of {c.name}: {d}'))
+    if args.ripristina:
+        c = cards[args.card - 1]
+        try:
+            prima = sm2_salvataggi.ripristina(c, Path(args.ripristina))
+        except (ValueError, OSError) as e:
+            log(T(f'ERRORE: {e}', f'ERROR: {e}'))
+            return 1
+        log(T(f'memory card {args.card} sostituita con {Path(args.ripristina).name}', f'memory card {args.card} replaced '
+              f'with {Path(args.ripristina).name}') + (T(f' (quella di prima e\' in {prima})', f' (the previous one is in '
+                                                         f'{prima})') if prima else ''))
+    log(T(f'Cartella dei salvataggi: {sm2_salvataggi.cartella_memory_card(cartella)}',
+          f'Saves folder: {sm2_salvataggi.cartella_memory_card(cartella)}'))
+    for i, c in enumerate(cards, 1):
+        r = sm2_salvataggi.leggi_memory_card(c)
+        if not r['ok']:
+            log(T(f'memory card {i}: ' + {'manca': 'non ancora creata (la crea il gioco)', 'formato': 'formato sconosciuto',
+                                          'non formattata': 'non formattata'}.get(r['motivo'], r['motivo']),
+                  f'memory card {i}: ' + {'manca': 'not created yet (the game creates it)', 'formato': 'unknown format',
+                                          'non formattata': 'not formatted'}.get(r['motivo'], r['motivo'])))
+            continue
+        log(T(f'memory card {i}: {len(r["salvataggi"])} salvataggi, {r["liberi"]} blocchi liberi su 15',
+              f'memory card {i}: {len(r["salvataggi"])} saves, {r["liberi"]} free blocks of 15'))
+        for x in r['salvataggi']:
+            n = x['blocchi']
+            log(f'  {x["titolo"] or x["file"]}  ({x["codice"]}{", " + x["regione"] if x["regione"] else ""}, '
+                + T(f'{n} blocc{"o" if n == 1 else "hi"})', f'{n} block{"" if n == 1 else "s"})'))
+        copie = sm2_salvataggi.copie_di_sicurezza(c)
+        if copie:
+            log(T(f'  copie di sicurezza: {len(copie)}, l\'ultima {copie[0].name}',
+                  f'  backups: {len(copie)}, the latest {copie[0].name}'))
+    rapidi = sm2_salvataggi.salvataggi_rapidi(cartella)
+    log(T(f'salvataggi rapidi (F7): {len(rapidi)}', f'save states (F7): {len(rapidi)}'))
+    for x in rapidi[:12]:
+        log(f'  slot {x["slot"]}: {x["data"]:%d/%m/%Y %H:%M}' + (T(', con anteprima', ', with preview') if x['anteprima']
+                                                                  else ''))
+    return 0
+
+
+def copia_in_versione(prof: str, card: Path, dest: str) -> int:
+    """0.12: le partite di Spider-Man 2 di questa versione (dalla memory card card) copiate nella memory card di un'altra
+    versione installata, con il nome che quella versione cerca: nella card 1 se non ha gia' partite di quella versione,
+    altrimenti nella card 2. La memory card che cambia va prima nelle copie di sicurezza."""
+    cat = catalogo()
+    if dest not in cat:
+        log(T(f'ERRORE: versione sconosciuta: {dest}', f'ERROR: unknown version: {dest}'))
+        return 1
+    cart_dest = GIOCHI / dest
+    if not cart_dest.is_dir():
+        log(T(f'ERRORE: {dest} non e\' installato', f'ERROR: {dest} is not installed'))
+        return 1
+    nome = sm2_salvataggi.NOME_SALVATAGGIO.get(dest)
+    scelta, motivo = None, ''
+    for c in sm2_salvataggi.percorsi_memory_card(cart_dest):
+        try:
+            sm2_salvataggi.copia_in_versione(card, prof, c, dest, prova=True)
+        except sm2_salvataggi.ErroreDestinazione as e:  # questa card di arrivo non va: si prova l'altra
+            motivo = str(e)
+            continue
+        except ValueError as e:                         # dipende dalla card di partenza: inutile provare l'altra
+            motivo = str(e)
+            break
+        scelta = c
+        break
+    if scelta is None:
+        log(T(f'ERRORE: {motivo}', f'ERROR: {motivo}'))
+        return 1
+    r = sm2_salvataggi.copia_in_versione(card, prof, scelta, dest)
+    partite = ', '.join(f'{x["nome"] or "?"} ({x["livello"].split("_")[0]})' for x in r['partite'])
+    log(T(f'Partite di {prof} copiate nella memory card {scelta.stem[-1]} di {dest} come {nome}: {partite}',
+          f'{prof} saved games copied to memory card {scelta.stem[-1]} of {dest} as {nome}: {partite}') +
+        (T(f' (la memory card di prima e\' in {r["copia"]})', f' (the previous memory card is in {r["copia"]})')
+         if r['copia'] else ''))
+    log(T('Nel gioco: MEMORY CARD, poi "load game data".', 'In the game: MEMORY CARD, then "load game data".'))
     return 0
 
 
@@ -3025,7 +4744,7 @@ def cmd_opzioni(args) -> int:
 def cmd_stato(args) -> int:
     cat = catalogo()
     cache = CacheHash(GIOCHI / 'cache_hash.json')
-    log(f'SM2-Recomp launcher {VERSIONE} - {ROOT}')
+    log(f'EnterElectro-Recomp launcher {VERSIONE} - {ROOT}')
     log(attiva_toolchain())
     log(dipendenze_offline())
     for prof, v in cat.items():
@@ -3049,7 +4768,16 @@ def cmd_stato(args) -> int:
                       (T(' (allarga solo mentre si gioca)', ' (widens only during gameplay)')
                        if st.get('gioco_widescreen') else '')) if st.get('bordi_widescreen') else '') +
                     (', PGO' if st.get('pgo') else '') +
-                    (T(', salto delle attese', ', idle skip') if attese_accese(cartella / 'game.toml') else ''))
+                    (T(', salto delle attese', ', idle skip') if attese_accese(cartella / 'game.toml') else '') +
+                    (T(f', filmati migliorati pronti ({(st.get("filmati_hd") or {}).get("byte", 0) / 1e9:.1f} GB)',
+                       f', enhanced movies prepared ({(st.get("filmati_hd") or {}).get("byte", 0) / 1e9:.1f} GB)')
+                     if filmati_hd_pronti(cartella, st) else '') +
+                    ''.join(T(f', filmati IA {m} pronti ({(st.get("filmati_ia") or {})[m].get("byte", 0) / 1e9:.1f} GB)',
+                              f', AI movies {m} prepared ({(st.get("filmati_ia") or {})[m].get("byte", 0) / 1e9:.1f} GB)')
+                            for m in MODELLI_IA if _ia().pronti(cartella, st, m)) +
+                    ('' if not (st.get('completata') and exe) or motore_uguale(st) else
+                     T(' - motore di una versione precedente: reinstalla per le novita\' (i salvataggi restano)',
+                       ' - engine of an earlier version: install again for the new features (the saves stay)')))
         nome = nome_versione(prof, v['nome'])
         log(f'{prof:<16} {nome:<45} ' + T(f'disco: {"si" if disco else "no":<3} ', f'disc: {"yes" if disco else "no":<3} ') + inst)
     cache.salva()
@@ -3060,14 +4788,14 @@ def cmd_stato(args) -> int:
 
 def menu() -> int:
     while True:
-        print(T('\nSM2-Recomp - launcher (prototipo)\n'
+        print(T(f'\nEnterElectro-Recomp - launcher {VERSIONE}\n'
                 '  1) riconosci i dischi in input\\\n'
                 '  2) importa un dump (scrivi o trascina qui il percorso del .cue/.ccd/.bin)\n'
                 '  3) installa una versione\n'
                 '  4) gioca\n'
                 '  5) stato\n'
                 '  0) esci',
-                '\nSM2-Recomp - launcher (prototype)\n'
+                f'\nEnterElectro-Recomp - launcher {VERSIONE}\n'
                 '  1) identify the discs in input\\\n'
                 '  2) import a dump (type or drag here the path of the .cue/.ccd/.bin)\n'
                 '  3) install a version\n'
@@ -3109,13 +4837,22 @@ def menu() -> int:
 # i valori inglesi diventano quelli italiani, che usa il resto del programma.
 # English names of commands, options and values (4 Nov 2026); the Italian ones keep working.
 ALIAS_COMANDI = {'identify': 'riconosci', 'import': 'importa', 'install': 'installa', 'play': 'avvia',
-                 'options': 'opzioni', 'status': 'stato', 'text': 'testo', 'prepare-recording': 'prepara-registrazione'}
+                 'options': 'opzioni', 'status': 'stato', 'text': 'testo', 'prepare-recording': 'prepara-registrazione',
+                 'prepare-movies': 'prepara-filmati', 'gamepads': 'controller', 'import-folder': 'importa-cartella',
+                 'saves': 'salvataggi', 'ai-download': 'ia-scarica', 'prepare-ai-movies': 'prepara-filmati-ia',
+                 'ai-previews': 'anteprime-ia'}
 VALORI_EN = {'yes': 'si', 'game': 'gioco', 'on': 'accesa', 'off': 'spenta', 'adaptive': 'adattiva',
              'window': 'finestra', 'borderless': 'senza-bordi', 'exclusive': 'esclusivo', 'half': 'meta', 'all': 'tutti',
-             'prepare': 'prepara', 'generate': 'genera', 'compile': 'compila'}
+             'prepare': 'prepara', 'generate': 'genera', 'compile': 'compila', 'original': 'originali',
+             'filter': 'filtro', 'enhanced': 'migliorati', 'keyboard': 'tastiera', 'analog': 'analogico',
+             'digital': 'digitale', 'ai-swin2sr': 'ia-swin2sr', 'ai-general': 'ia-general', 'ai-anime': 'ia-anime',
+             'fit': 'adatta'}
 PASSI_EN = {'prepara': 'prepare', 'm3': 'm3', 'genera': 'generate', 'compila': 'compile'}
-CON_VALORI = ('risoluzione', 'pgxp', 'filtro_texture', 'scaling', 'crt', 'audio_hq', 'distanza', 'attese', 'sincronia',
-              'thread_video', 'schermo', 'latenza_bassa', 'movimento_fluido', 'cpu', 'motore', 'widescreen')
+CON_VALORI = ('risoluzione', 'pgxp', 'pgxp_texture', 'pgxp_colori', 'pgxp_culling', 'pgxp_proiezione', 'pgxp_cpu',
+              'pgxp_cache', 'pgxp_profondita', 'pgxp_no2d', 'pgxp_trasparenti', 'filtro_texture', 'scaling', 'crt', 'audio_hq', 'distanza', 'attese',
+              'sincronia',
+              'thread_video', 'schermo', 'latenza_bassa', 'movimento_fluido', 'cpu', 'motore', 'widescreen', 'filmati',
+              'controller', 'modo_pad')
 
 
 def con_inglese(*valori) -> tuple:
@@ -3146,7 +4883,7 @@ def lingua_da_argomenti(argv: list) -> list:
 def main(argv=None) -> int:
     argv = lingua_da_argomenti(list(sys.argv[1:] if argv is None else argv))
     SI_NO = con_inglese('si', 'no')
-    ap = argparse.ArgumentParser(description=T('SM2-Recomp launcher (prototipo)', 'SM2-Recomp launcher (prototype)'),
+    ap = argparse.ArgumentParser(description=T(f'EnterElectro-Recomp launcher {VERSIONE}', f'EnterElectro-Recomp launcher {VERSIONE}'),
                                  epilog=T('Lingua: --lingua it|en (anche --language). I comandi hanno anche i nomi '
                                           'inglesi: identify, import, install, play, options, status, gui, text.',
                                           'Language: --language it|en (also --lingua). The commands also have Italian '
@@ -3190,9 +4927,17 @@ def main(argv=None) -> int:
                           'compilazione in piu\'): circa il 15%% di CPU in meno',
                           'executable optimized with PGO (a training game of about 3 minutes, then one more build): '
                           'about 15%% less CPU'))
+    p.add_argument('--pgo-allena', '--pgo-train', action='store_true',
+                   help=T('con --pgo: fa la partita di allenamento anche se il pacchetto ha il profilo gia\' pronto '
+                          '(per preparare i profili)',
+                          'with --pgo: do the training game even if the package has the ready-made profile (to prepare '
+                          'the profiles)'))
     p.add_argument('--attese', '--idle-skip', choices=SI_NO, default='si',
                    help=T('salto delle attese di psxrecomp nel game.toml (di default si; il gioco resta identico)',
                           'psxrecomp idle skip in game.toml (yes by default; the game stays identical)'))
+    p.add_argument('--rigenera', '--regenerate', action='store_true',
+                   help=T('traduce di nuovo il codice del gioco anche se disco, motore e impostazioni non sono cambiati',
+                          'translates the game code again even if disc, engine and settings did not change'))
     p.add_argument('--passi', '--steps', nargs='+', default=['prepara', 'm3', 'genera', 'compila'],
                    choices=con_inglese('prepara', 'm3', 'genera', 'compila'))
     p.add_argument('--registratore', '--recorder', action='store_true',
@@ -3215,6 +4960,7 @@ def main(argv=None) -> int:
     p.add_argument('--prova', '--test', type=int, default=0, metavar=T('SECONDI', 'SECONDS'),
                    help=T('prova: tiene il gioco aperto N secondi, poi lo chiude',
                           'test: keeps the game open N seconds, then closes it'))
+    p.add_argument('--nascosta', '--hidden', action='store_true', help=argparse.SUPPRESS)  # prove: finestra nascosta
     p.set_defaults(fn=cmd_avvia)
     p = sub.add_parser('prepara-registrazione', aliases=['prepare-recording'],
                        help=T('QA: prepara un\'installazione con il registratore (cache del codice compilato al volo), '
@@ -3227,6 +4973,48 @@ def main(argv=None) -> int:
     p.add_argument('--debug', action='store_true',
                    help=T('build-dev invece di build-release', 'build-dev instead of build-release'))
     p.set_defaults(fn=cmd_prepara_registrazione)
+    p = sub.add_parser('prepara-filmati', aliases=['prepare-movies'],
+                       help=T('prepara i filmati migliorati di una versione installata, dal suo disco (una volta sola)',
+                              'prepares the enhanced movies of an installed version, from its disc (only once)'))
+    p.add_argument('--profilo', '--profile', required=True, metavar=T('PROFILO', 'PROFILE'))
+    p.add_argument('--cartella', '--folder', default='', metavar=T('CARTELLA', 'FOLDER'))
+    p.add_argument('--scala', '--scale', type=int, choices=(2, 3, 4), default=FMV_SCALA,
+                   help=T('ingrandimento (di default 4: circa 1,3 GB; 3: circa 0,9 GB)',
+                          'upscale factor (default 4: about 1.3 GB; 3: about 0.9 GB)'))
+    p.add_argument('--qualita', '--quality', type=int, default=FMV_QUALITA, help=argparse.SUPPRESS)
+    p.add_argument('--processi', '--jobs', type=int, default=0, metavar='N',
+                   help=T('processi in parallelo (di default tre quarti dei processori logici)',
+                          'parallel processes (by default three quarters of the logical processors)'))
+    p.add_argument('--rifai', '--redo', action='store_true',
+                   help=T('rifa\' i filmati anche se sono gia\' pronti', 'redoes the movies even if already prepared'))
+    p.set_defaults(fn=cmd_prepara_filmati)
+    p = sub.add_parser('ia-scarica', aliases=['ai-download'],
+                       help=T('filmati IA: scarica (una volta) i programmi e i modelli in tools/ia; solo con --si',
+                              'AI movies: downloads (once) the programs and models into tools/ia; only with --yes'))
+    p.add_argument('--modelli', '--models', default='', metavar='swin2sr,general,anime',
+                   help=T('di default tutti e tre', 'all three by default'))
+    p.add_argument('--si', '--yes', action='store_true',
+                   help=T('scarica davvero (senza: dice solo cosa e quanto)', 'really download (without: only says what and how much)'))
+    p.set_defaults(fn=cmd_ia_scarica)
+    p = sub.add_parser('prepara-filmati-ia', aliases=['prepare-ai-movies'],
+                       help=T('prepara i filmati IA di una versione installata con un modello, dal suo disco (una volta)',
+                              'prepares the AI movies of an installed version with one model, from its disc (once)'))
+    p.add_argument('--profilo', '--profile', required=True, metavar=T('PROFILO', 'PROFILE'))
+    p.add_argument('--cartella', '--folder', default='', metavar=T('CARTELLA', 'FOLDER'))
+    p.add_argument('--modello', '--model', required=True, choices=MODELLI_IA)
+    p.add_argument('--stabilizza', '--stabilise', type=int, default=30, metavar='0-100',
+                   help=T('parte dell\'immagine nuova a ogni fotogramma (di default 30; 100 = niente stabilizzazione)',
+                          'share of the new picture at each frame (default 30; 100 = no stabilisation)'))
+    p.add_argument('--processi', '--jobs', type=int, default=0, metavar='N', help=argparse.SUPPRESS)
+    p.add_argument('--rifai', '--redo', action='store_true',
+                   help=T('rifa\' i filmati anche se sono gia\' pronti', 'redoes the movies even if already prepared'))
+    p.set_defaults(fn=cmd_prepara_filmati_ia)
+    p = sub.add_parser('anteprime-ia', aliases=['ai-previews'],
+                       help=T('filmati IA: immagini di prova di ogni modello pronto e tempi su questo PC',
+                              'AI movies: test pictures of every ready model and times on this PC'))
+    p.add_argument('--profilo', '--profile', required=True, metavar=T('PROFILO', 'PROFILE'))
+    p.add_argument('--cartella', '--folder', default='', metavar=T('CARTELLA', 'FOLDER'))
+    p.set_defaults(fn=cmd_anteprime_ia)
     p = sub.add_parser('opzioni', aliases=['options'],
                        help=T('opzioni del giocatore che restano (mod di psxrecomp in mods/state.toml)',
                               'player options that are kept (psxrecomp mods in mods/state.toml)'))
@@ -3234,17 +5022,87 @@ def main(argv=None) -> int:
     p.add_argument('--cartella', '--folder', default='', metavar=T('CARTELLA', 'FOLDER'))
     p.add_argument('--risoluzione', '--resolution',
                    choices=con_inglese('gioco', 'native', '720p', '1080p', '1440p', '4k', '5k', '8k', 'display', 'auto'))
-    p.add_argument('--pgxp', choices=SI_NO)
+    p.add_argument('--pgxp', choices=SI_NO,
+                   help=T('PGXP (correzione della geometria, come in DuckStation); funziona davvero con un\'installazione '
+                          'fatta con installa --pgxp', 'PGXP (geometry correction, as in DuckStation); it really works with '
+                          'an installation made with install --pgxp'))
+    for chiave, it, en, aiuto_it, aiuto_en in (
+            ('texture', 'texture', 'texture', 'texture in prospettiva (di partenza: si)',
+             'perspective-correct textures (default: yes)'),
+            ('colori', 'colori', 'colours', 'colori in prospettiva, solo con le texture in prospettiva (di '
+             'partenza: no)', 'perspective-correct colours, only with perspective-correct textures (default: no)'),
+            ('culling', 'culling', 'culling', 'correzione del culling (di partenza: si)',
+             'culling correction (default: yes)'),
+            ('proiezione', 'proiezione', 'projection', 'precisione della proiezione (di partenza: no)',
+             'preserve projection precision (default: no)'),
+            ('cpu', 'cpu', 'cpu', 'modalita\' CPU (di partenza: si\', come DuckStation per Spider-Man 2; costa '
+             'processore)', 'CPU mode (default: yes, as DuckStation for Spider-Man 2; costs processor)'),
+            ('cache', 'cache', 'vertex-cache', 'cache dei vertici (di partenza: no)', 'vertex cache (default: no)'),
+            ('profondita', 'profondita', 'depth', 'buffer di profondita\', solo con le texture in prospettiva (di '
+             'partenza: no; bassa compatibilita\')',
+             'depth buffer, only with perspective-correct textures (default: no; low compatibility)'),
+            ('no2d', 'no2d', 'disable-2d', 'niente PGXP sui poligoni 2D: i poligoni senza profondita\' (interfaccia e '
+             'scritte) nella posizione della PS1, per tutto il poligono come in DuckStation (Disable on 2D Polygons; '
+             'di partenza: no)',
+             'disable on 2D polygons: polygons without depth (interface and text) at the PS1 position, for the whole '
+             'polygon as in DuckStation (default: no)'),
+            ('trasparenti', 'trasparenti', 'transparent-depth', 'profondita\' anche per i poligoni semitrasparenti, '
+             'solo con il buffer di profondita\' (Depth Test Transparent Polygons; di partenza: no)',
+             'depth test transparent polygons, only with the depth buffer (default: no)')):
+        p.add_argument(f'--pgxp-{it}', *([f'--pgxp-{en}'] if en != it else []), dest=f'pgxp_{chiave}', choices=SI_NO,
+                       help=T('PGXP: ' + aiuto_it, 'PGXP: ' + aiuto_en))
+    p.add_argument('--pgxp-tolleranza', '--pgxp-tolerance', dest='pgxp_tolleranza', type=float, default=None,
+                   metavar='PIXEL', help=T('PGXP: tolleranza della geometria in pixel (di partenza 3, come DuckStation '
+                                           'per Spider-Man 2; -1 = nessun limite)',
+                                           'PGXP: geometry tolerance in pixels (3 by default, as DuckStation for '
+                                           'Spider-Man 2; -1 = no limit)'))
+    p.add_argument('--pgxp-soglia', '--pgxp-depth-threshold', dest='pgxp_soglia', type=float, default=None,
+                   metavar='SZ', help=T('PGXP: soglia di pulizia del buffer di profondita\' (di partenza 4096; 0 = mai)',
+                                        'PGXP: depth buffer clear threshold (4096 by default; 0 = never)'))
+    p.add_argument('--pgxp-fessure', '--pgxp-seams', dest='pgxp_fessure', choices=('no', 'off', 'fine', 'largo', 'wide'),
+                   help=T('PGXP: chiude le fessure tra poligoni precisi ad alta risoluzione (in piu\' di DuckStation; '
+                          'di partenza no)', 'PGXP: closes the cracks between precise polygons at high resolution '
+                          '(extra to DuckStation; default no)'))
+    p.add_argument('--pgxp-bias', '--pgxp-depth-bias', dest='pgxp_bias', type=float, default=None,
+                   metavar='MILIONESIMI',
+                   help=T('PGXP: Depth Bias, di quanti milionesimi della profondita\' ogni poligono va verso la '
+                          'telecamera rispetto a quelli prima; solo con il buffer di profondita\' (di partenza 1, come '
+                          'DuckStation; da 0 a 1000)', 'PGXP: Depth Bias, by how many millionths of depth each polygon '
+                          'moves towards the camera from the ones before; only with the depth buffer (1 by default, as '
+                          'in DuckStation; 0 to 1000)'))
+    p.add_argument('--pgxp-normalizza', '--pgxp-normalize-depth', dest='pgxp_normalizza',
+                   choices=('automatico', 'automatic', 'no', 'disabled', 'off', 'profondita', 'depth-buffer', 'sempre',
+                            'always'),
+                   help=T('PGXP: Normalize Depth Scale, la profondita\' di ogni vertice divisa per la scala della '
+                          'trasformazione del suo oggetto: automatico (di partenza, come DuckStation: spenta per '
+                          'Spider-Man 2), no, profondita (solo con il buffer di profondita\') o sempre (anche le texture '
+                          'in prospettiva)', 'PGXP: Normalize Depth Scale, each vertex depth divided by the scale of '
+                          'its object transform: automatic (default, as in DuckStation: off for Spider-Man 2), '
+                          'disabled, depth-buffer (depth buffer only) or always (texture correction too)'))
+    p.add_argument('--pgxp-predefiniti', '--pgxp-defaults', dest='pgxp_predefiniti', action='store_true',
+                   help=T('PGXP: tutte le voci come DuckStation per Spider-Man 2 (acceso o spento resta com\'e\')',
+                          'PGXP: every item as DuckStation for Spider-Man 2 (on or off stays as it is)'))
     p.add_argument('--filtro-texture', '--texture-filter', choices=con_inglese('gioco', 'nearest', 'bilinear', 'xbr'))
     p.add_argument('--scaling', choices=con_inglese('gioco', 'smooth', 'sharp'))
+    p.add_argument('--filmati', '--movies', choices=con_inglese('originali', 'filtro', 'migliorati', *FILMATI_IA),
+                   help=T('filmati: originali (a blocchi, come sulla PS1), filtro in tempo reale (blocchi della '
+                          'compressione attenuati, colori piu\' puliti, ingrandimento che segue i contorni), migliorati '
+                          '(preparati prima con prepara-filmati) o IA (ia-swin2sr, '
+                          'ia-general, ia-anime: preparati prima con prepara-filmati-ia); solo OpenGL',
+                          'movies: original (blocky, as on the PS1), real-time filter (compression blocks softened, '
+                          'cleaner colours, upscaling that follows the edges), enhanced (prepared first with '
+                          'prepare-movies) or AI (ai-swin2sr, ai-general, '
+                          'ai-anime: prepared first with prepare-ai-movies); OpenGL only'))
     p.add_argument('--crt', choices=SI_NO)
     p.add_argument('--audio-hq', choices=SI_NO)
-    p.add_argument('--widescreen', choices=('no', '16:9', '16:10', '21:9'),
-                   help=T('mod Widescreen di SM2-Recomp (sperimentale; serve un\'installazione dalla v0.5)',
-                          'SM2-Recomp Widescreen mod (experimental; needs an installation from 0.5 on)'))
+    p.add_argument('--widescreen', choices=con_inglese('no', '16:9', '16:10', '21:9', 'adatta'),
+                   help=T('mod Widescreen di EnterElectro-Recomp (sperimentale; serve un\'installazione dalla v0.5); '
+                          'adatta: l\'immagine segue la forma della finestra',
+                          'EnterElectro-Recomp Widescreen mod (experimental; needs an installation from 0.5 on); '
+                          'fit: the picture follows the shape of the window'))
     p.add_argument('--distanza', '--draw-distance', choices=SI_NO,
-                   help=T('mod "Distanza visiva" di SM2-Recomp (sperimentale; serve un\'installazione dalla v0.6)',
-                          'SM2-Recomp "Draw distance" mod (experimental; needs an installation from 0.6 on)'))
+                   help=T('mod "Distanza visiva" di EnterElectro-Recomp (sperimentale; serve un\'installazione dalla v0.6)',
+                          'EnterElectro-Recomp "Draw distance" mod (experimental; needs an installation from 0.6 on)'))
     p.add_argument('--attese', '--idle-skip', choices=SI_NO,
                    help=T('salto delle attese di psxrecomp (meno lavoro per la CPU; serve un\'installazione dalla v0.10)',
                           'psxrecomp idle skip (less CPU work; needs an installation from 0.10 on)'))
@@ -3268,7 +5126,60 @@ def main(argv=None) -> int:
     p.add_argument('--movimento-fluido', '--smooth-motion', choices=SI_NO,
                    help=T('immagini intermedie per schermi a 120 Hz o piu\' (sperimentale; settings.toml [video] frame_generation)',
                           'in-between frames for 120 Hz or faster screens (experimental; settings.toml [video] frame_generation)'))
+    p.add_argument('--volume', type=int, default=-1, metavar='%',
+                   help=T('volume del gioco all\'avvio, da 0 a 100 (nel gioco lo cambiano + e - del tastierino; serve '
+                          'un\'installazione della 0.12)', 'game volume at start, 0 to 100 (in the game the keypad + and '
+                          '- change it; needs a 0.12 installation)'))
+    p.add_argument('--controller', '--gamepad', default='', metavar='auto|' + T('tastiera', 'keyboard') + '|GUID',
+                   help=T('controller del giocatore 1 (settings.toml [controller] p1_device): auto = il primo collegato, '
+                          'tastiera = solo la tastiera, oppure il GUID di un controller (comando "controller")',
+                          'player 1 gamepad (settings.toml [controller] p1_device): auto = the first connected one, '
+                          'keyboard = keyboard only, or the GUID of a gamepad ("gamepads" command)'))
+    p.add_argument('--modo-pad', '--pad-mode', choices=con_inglese('analogico', 'digitale'),
+                   help=T('controller analogico (levette) o digitale (la levetta sinistra fa da croce direzionale)',
+                          'analog gamepad (sticks) or digital (the left stick acts as the d-pad)'))
+    p.add_argument('--zona-morta', '--deadzone', type=int, default=-1, metavar='%',
+                   help=T('zona morta delle levette in percentuale, 0-50 (di default 10)',
+                          'stick dead zone in percent, 0-50 (10 by default)'))
+    p.add_argument('--comandi', '--controls', default='', metavar=T('FILE.json', 'FILE.json'),
+                   help=T('tasti del controller e della tastiera: JSON con "pad" e "tastiera", ognuno {comando: valore} '
+                          '(comandi: ' + ', '.join(sm2_comandi.CHIAVI) + ')',
+                          'gamepad and keyboard keys: JSON with "pad" and "keyboard", each {control: value} (controls: ' +
+                          ', '.join(sm2_comandi.CHIAVI) + ')'))
+    p.add_argument('--comandi-predefiniti', '--default-controls', action='store_true',
+                   help=T('rimette i tasti del controller e della tastiera come li ha il gioco',
+                          'puts the gamepad and keyboard keys back to the game\'s defaults'))
     p.set_defaults(fn=cmd_opzioni)
+    p = sub.add_parser('salvataggi', aliases=['saves'],
+                       help=T('memory card e salvataggi rapidi di una versione: elenco, copie di sicurezza, ripristino',
+                              'memory cards and save states of a version: list, backups, restore'))
+    p.add_argument('--profilo', '--profile', required=True, metavar=T('PROFILO', 'PROFILE'))
+    p.add_argument('--copia', '--backup', action='store_true',
+                   help=T('fa una copia di sicurezza delle memory card (in saves/copie/)',
+                          'makes a backup of the memory cards (in saves/copie/)'))
+    p.add_argument('--ripristina', '--restore', default='', metavar=T('FILE', 'FILE'),
+                   help=T('mette nella memory card questo file (una copia o una memory card .mcd, .mcr, .gme), dopo una '
+                          'copia di quella di adesso', 'puts this file (a backup or a .mcd, .mcr, .gme memory card) into '
+                          'the memory card, after a backup of the current one'))
+    p.add_argument('--card', type=int, choices=(1, 2), default=1, help=T('quale memory card (1 o 2)', 'which memory card (1 or 2)'))
+    p.add_argument('--copia-in', '--copy-to', default='', metavar=T('VERSIONE', 'VERSION'),
+                   help=T('copia le partite di questa versione (dalla memory card --card) nella memory card di un\'altra '
+                          'versione installata, con il nome che quella cerca', 'copies the saved games of this version '
+                          '(from memory card --card) to the memory card of another installed version, with the name '
+                          'that version looks for'))
+    p.set_defaults(fn=cmd_salvataggi)
+    p = sub.add_parser('importa-cartella', aliases=['import-folder'],
+                       help=T('prende dischi, installazioni e salvataggi dalla cartella di una versione precedente '
+                              '(li sposta)', 'takes discs, installations and saves from the folder of an earlier '
+                              'version (moves them)'))
+    p.add_argument('cartella', metavar=T('CARTELLA', 'FOLDER'))
+    p.add_argument('--prova', '--dry-run', action='store_true',
+                   help=T('mostra soltanto cosa sposterebbe', 'only shows what it would move'))
+    p.set_defaults(fn=cmd_importa_cartella)
+    p = sub.add_parser('controller', aliases=['gamepads'],
+                       help=T('i controller collegati adesso, con il GUID per opzioni --controller',
+                              'the gamepads connected now, with the GUID for options --controller'))
+    p.set_defaults(fn=cmd_controller)
     p = sub.add_parser('stato', aliases=['status'],
                        help=T('versioni conosciute, dischi e installazioni', 'known versions, discs and installations'))
     p.set_defaults(fn=cmd_stato)

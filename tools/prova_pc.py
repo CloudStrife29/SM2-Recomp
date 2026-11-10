@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SM2-Recomp - prova del PC: il gioco va a piena velocita' su questo computer?
+"""EnterElectro-Recomp - prova del PC: il gioco va a piena velocita' su questo computer?
 
 Pensata per i PC meno potenti (per esempio un portatile). Si lancia con un doppio clic su PROVA-PC.cmd, nella
 cartella del pacchetto, dopo aver aggiunto almeno un disco con SM2-Launcher. In ordine:
@@ -14,7 +14,7 @@ cartella del pacchetto, dopo aver aggiunto almeno un disco con SM2-Launcher. In 
      rispetto al tempo reale, in tutto e nel livello, e quanto va veloce senza il limite dei 60 frame al secondo
      (turbo); circa 3 minuti;
   5. CPU dell'eseguibile con cui si gioca (tools/misura_cpu.py: 60 secondi a finestra nascosta, senza tasti);
-  6. scrive work/prova_pc/rapporto.txt e lo zip work/prova_pc/SM2-Recomp-prova-pc-<data>.zip, da mandare a chi
+  6. scrive work/prova_pc/rapporto.txt e lo zip work/prova_pc/EnterElectro-Recomp-prova-pc-<data>.zip, da mandare a chi
      segue il progetto (contiene solo testi e misure, niente del gioco).
 L'audio resta spento durante le misure. Non cambia niente nel sistema; le opzioni del giocatore restano com'erano.
 
@@ -35,11 +35,11 @@ poi la variabile SM2_LINGUA, poi lingua.txt scritto dalla finestra del launcher,
 inglesi delle opzioni: --profile, --no-install, --cpu-seconds, --cpu all|half, --language. I nomi dei file e le
 chiavi di rapporto.json restano uguali.
 
-English: SM2-Recomp PC test - does the game run at full speed on this computer? Double-click PROVA-PC.cmd in the
+English: EnterElectro-Recomp PC test - does the game run at full speed on this computer? Double-click PROVA-PC.cmd in the
 package folder after adding at least one disc with SM2-Launcher. It installs the game version with PGO and the test
 executable if needed (on slow PCs this can take more than half an hour, only once), runs a start-up test (the game
 goes by itself to the first level and measures its speed, about 3 minutes), measures the CPU used by the game
-executable for 60 seconds, then writes work/prova_pc/rapporto.txt and the zip work/prova_pc/SM2-Recomp-prova-pc-<date>.zip
+executable for 60 seconds, then writes work/prova_pc/rapporto.txt and the zip work/prova_pc/EnterElectro-Recomp-prova-pc-<date>.zip
 to send to the project (it contains only texts and measurements, nothing from the game). Audio stays off during the
 measurements; nothing in the system and none of the player's options are changed.
 Usage: PROVA-PC.cmd [--profile SLUS-01378-Rev1] [--no-install] [--cpu-seconds 60] [--cpu all|half] [--language it|en]
@@ -153,8 +153,8 @@ def lingua_da_argomenti(argv: list) -> str:
 
 def main() -> int:
     imposta_lingua(lingua_da_argomenti(sys.argv[1:]))
-    ap = argparse.ArgumentParser(description=T('SM2-Recomp - prova del PC: il gioco va a piena velocita\' su questo '
-                                               'computer?', 'SM2-Recomp - PC test: does the game run at full speed '
+    ap = argparse.ArgumentParser(description=T('EnterElectro-Recomp - prova del PC: il gioco va a piena velocita\' su questo '
+                                               'computer?', 'EnterElectro-Recomp - PC test: does the game run at full speed '
                                                'on this computer?'))
     ap.add_argument('--profilo', '--profile', dest='profilo', default='', metavar=T('VERSIONE', 'VERSION'),
                     help=T('versione da provare (di default la prima installata o con il disco)',
@@ -178,7 +178,7 @@ def main() -> int:
     USCITA.mkdir(parents=True, exist_ok=True)
     inizio = time.time()
     ora = datetime.datetime.now()
-    scrivi(T(f'== SM2-Recomp, prova del PC - {ora:%Y-%m-%d %H:%M}', f'== SM2-Recomp, PC test - {ora:%Y-%m-%d %H:%M}'))
+    scrivi(T(f'== EnterElectro-Recomp, prova del PC - {ora:%Y-%m-%d %H:%M}', f'== EnterElectro-Recomp, PC test - {ora:%Y-%m-%d %H:%M}'))
     pc = info_pc()
     scrivi(T(f'   processore: {pc.get("processore")}; processori logici: {pc.get("processori_logici")}; '
              f'memoria: {pc.get("memoria_gb", "?")} GB; sistema: {pc.get("sistema")}',
@@ -301,7 +301,7 @@ def main() -> int:
     risultati['giudizio'] = giudizio
     risultati['durata_secondi'] = round(time.time() - inizio)
     rc = risultati['cpu']
-    righe = [T(f'SM2-Recomp - prova del PC, {risultati["data"]}', f'SM2-Recomp - PC test, {risultati["data"]}'), '',
+    righe = [T(f'EnterElectro-Recomp - prova del PC, {risultati["data"]}', f'EnterElectro-Recomp - PC test, {risultati["data"]}'), '',
              f'Computer: {pc.get("computer")}',
              T(f'Processore: {pc.get("processore")} ({pc.get("processori_logici")} processori logici)',
                f'Processor: {pc.get("processore")} ({pc.get("processori_logici")} logical processors)'),
@@ -335,7 +335,7 @@ def main() -> int:
               T(f'Durata della prova: {risultati["durata_secondi"]} s', f'Test duration: {risultati["durata_secondi"]} s')]
     (USCITA / 'rapporto.txt').write_text('\n'.join(righe) + '\n', encoding='utf-8')
     (USCITA / 'rapporto.json').write_text(json.dumps(risultati, indent=1, ensure_ascii=False), encoding='utf-8')
-    nome_zip = USCITA / f'SM2-Recomp-prova-pc-{ora:%Y%m%d-%H%M}.zip'
+    nome_zip = USCITA / f'EnterElectro-Recomp-prova-pc-{ora:%Y%m%d-%H%M}.zip'
     with zipfile.ZipFile(nome_zip, 'w', zipfile.ZIP_DEFLATED) as z:
         for f in [USCITA / 'rapporto.txt', USCITA / 'rapporto.json', USCITA / 'prova_pc_log.txt',
                   USCITA / 'installazione.txt', USCITA / 'test_avvio.txt', USCITA / 'misura_cpu.txt',

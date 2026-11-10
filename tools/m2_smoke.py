@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""SM2-Recomp - test di avvio e misura delle prestazioni del gioco ricompilato (v9).
+"""EnterElectro-Recomp - test di avvio e misura delle prestazioni del gioco ricompilato (v9).
 
-English: SM2-Recomp start-up test and performance measurement of the recompiled game. It starts the development
+English: EnterElectro-Recomp start-up test and performance measurement of the recompiled game. It starts the development
 executable (build-dev, with the TCP debug server), presses the buttons at exact game frames, saves PNG screenshots,
 measures the speed against real time and, inside the level, the CPU profile and the instructions still run by the
 interpreter; at the end a few seconds in turbo mode measure what a frame really costs. The comments are in Italian.
@@ -348,7 +348,7 @@ def main() -> int:
     out = ROOT / 'work' / 'm2' / args.label
     out.mkdir(parents=True, exist_ok=True)
     _log_f = open(out / 'smoke_log.txt', 'w', encoding='utf-8', errors='replace')
-    log(f'SM2-Recomp - test m2_smoke v13 - {datetime.datetime.now():%Y-%m-%d %H:%M:%S}')
+    log(f'EnterElectro-Recomp - test m2_smoke v13 - {datetime.datetime.now():%Y-%m-%d %H:%M:%S}')
     try:
         presses = parse_presses(args.presses)
     except ValueError as e:
@@ -630,7 +630,7 @@ def main() -> int:
                 f"p95 {s['wall_ms_p95']}, max {s['wall_ms_max']}; interprete {s['istr_interprete_per_frame']} istruzioni/frame")
     top_fn = (named_turbo or named_level or {}).get('functions') or []
     summary = [
-        'SM2-Recomp - test di avvio / prestazioni (m2_smoke v13)',
+        'EnterElectro-Recomp - test di avvio / prestazioni (m2_smoke v13)',
         f'etichetta: {args.label}   data: {datetime.datetime.now():%Y-%m-%d %H:%M}',
         f"PC: {pc['computer']} - {pc['processore']} - {pc['processori_logici']} processori logici",
         ('altri compilatori attivi alla partenza: ' + (', '.join(busy) + ' -> MISURE DA RIPETERE A PC LIBERO'

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""SM2-Recomp - Milestone 3: scrive aot/overlays.json, il profilo AOT di psxrecomp per i moduli
+"""EnterElectro-Recomp - Milestone 3: scrive aot/overlays.json, il profilo AOT di psxrecomp per i moduli
 di codice di CD.WAD (.bin + .rel), dal disco dell'utente.
 
-English: SM2-Recomp Milestone 3 - writes aot/overlays.json, the psxrecomp AOT profile for the code modules in
+English: EnterElectro-Recomp Milestone 3 - writes aot/overlays.json, the psxrecomp AOT profile for the code modules in
 CD.WAD (.bin + .rel), from the user's own disc. The profile holds only facts (disc hash, offsets, sizes and SHA-256
 of the modules, relocation counts, load bases from aot/sm2_placements.json), no game bytes. The comments are in
 Italian.

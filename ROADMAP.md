@@ -1,41 +1,55 @@
-# SM2-Recomp — roadmap
+# EnterElectro-Recomp — roadmap
 
 Italiano: vedi PROSSIMI_OBIETTIVI.md.
 
-This file comes with every published version of the launcher and says what comes next. It is a plan, not a promise: the order can change with what the tests show. Every version is released only after a complete round of tests: on the main versions of the game all 44 levels, long runs and a test of the package without internet; on the others installation, the start of every level and part of the story. Version 0.11 was fully tested in all 7 versions.
+This file comes with every published version of the launcher and says what comes next. It is a plan, not a promise: the order can change with what the tests show. Every version is released only after a complete round of tests: on the main versions of the game all 44 levels, long runs and a test of the package without internet; on the others installation, the start of every level and part of the story.
 
-Current version: 0.11 (November 2026). Plan updated on 5 November 2026: 0.12 will be the last version before the game is rewritten (decompilation) and also brings everything that was planned for later.
+Current version: 0.12 (November 2026). 0.12 is the last version before the game is rewritten (decompilation): it also brings the features that were planned for 0.13; the remaining ones are under "After 0.12".
 
-## After 0.11: version 0.12
+## New in 0.12
 
-1. **Sharper movies.** The game's movies are 320×240 and heavily compressed. The launcher will have a "Movies" choice with these entries:
-   - **Original**, as now;
-   - **Real-time filter**: while the movie plays, it removes the compression blocks and upscales it better, with no preparation;
-   - **Enhanced**: a button prepares, once, on your PC and from your disc, an upscaled version of every movie, which the game then plays instead of the originals. Like the rest of the PC game, the enhanced movies stay on your computer and are never distributed.
-   - **AI movies, your choice:** three AI upscalers, Swin2SR (faithful: it does not invent detail), Real-ESRGAN general-x4v3 and Real-ESRGAN animevideov3 (sharper, but they invent some detail). The launcher shows test pictures made with each model from your disc and lists the possible defects of each; the programs and models are downloaded only if you choose this option.
-2. **A more polished launcher.** A background picture for each version of the game, as in OpenGOAL, taken from your disc when you install (a frame of the enhanced movies or a scene of the game at 4K), and a cleaner window, divided into tabs.
-3. **Controller in the first window.** Choose the controller, test its buttons and assign the game's commands by pressing the button to use; the same for the keyboard. Xbox and PlayStation controllers recognised automatically, rumble.
-4. **Saves.** Memory cards managed from the launcher (backups, restoring, copying to another PC) and quick saves with a preview picture.
-5. **Volume** adjustable from the launcher.
-6. **Faster installation**, above all on PCs with few processors: a ready-made PGO profile in the package (no training game and a single build), full optimisation only for the code the game uses often and, if possible, the engine already compiled. The game must stay as fast as it is now.
-7. **Updates without reinstalling.** The new launcher keeps the games already installed and asks to reinstall them only when the engine changes. Going from 0.11 to 0.12 needs one reinstall.
-8. **Less stutter and no tearing:** a steadier picture on 60, 120, 144 and 240 Hz screens, also when the game's rate (50 Hz in Europe, 60 Hz in the USA and Japan) does not match the screen's.
-9. **Known issues to fix:**
-   - on low-end PCs, small slowdowns in a few heavy places (the Create-a-Spidey menu at 1080p, the turrets of "Rooftops By Night", the final battle with Sandman);
-   - two reported graphics issues, still to be checked against the original PlayStation: the sky in one spot of the first level, and a light visible through a wall in "In Darkest Night";
-   - widescreen: in a few places an object very close to the camera appears cut off at the edge of the original 4:3 picture;
-   - the "render thread" option does not start in the game executable;
-   - the game recorder (used for testing) stops where the game compiles new code during play;
-   - two behaviours seen in the automated tests, to be understood better: a difference at the first start of a new executable, and a slow exit of the Japanese test executable.
+- **Sharper movies:** the "Movies" choice with Original, Real-time filter and Enhanced; the enhanced movies are prepared once on your PC, from your disc, and stay there.
+- **AI-upscaled movies, your choice:** three AI upscalers, **Swin2SR** (faithful: it does not invent detail), **Real-ESRGAN general-x4v3** and **Real-ESRGAN animevideov3** (sharper, but they invent some detail). In the **Movies** window each one has two test pictures made from your disc, its possible defects and the time it takes on your PC; the preparation uses the graphics card (NVIDIA, AMD or Intel) and can be stopped and resumed. Text is stabilised over time (in the laboratory of the opening movie it wobbles about 10-12% less). The AI programs and models are downloaded only if you ask (tested on 6 November 2026: about 98 MB in 20 seconds, every file checked against its SHA-256 hash).
+- **New launcher:** a fully drawn window, with the versions as cards, a big button and a background taken from your disc's enhanced movies (or a night city drawn for EnterElectro-Recomp); its own icon (spider web, lightning and SM2), also on the **EnterElectro-Recomp** shortcut that the launcher puts in its folder.
+- **Controls in the first window:** controller choice, controller buttons and keyboard keys assigned by pressing them, live test; rumble with the controller connected before starting the game.
+- **Saves:** memory cards and quick saves with previews on the Saves page, with backups and restore; saved games can be copied from one version to another (for example from Europe to USA), with the name and screen height that version expects.
+- **New real-time filter** in the engine: compression blocks softened (according to the compression of each movie), colour interpolated between pixels, edge-following upscaling with a little sharpening and no halos; small text stays as it is.
+- **Start-up volume** from the launcher.
+- **Complete PGXP, as in DuckStation:** precise geometry with all of DuckStation's items (texture and colour correction, culling correction, preserve projection precision, CPU mode, vertex cache, depth buffer with transparent polygons, depth bias, normalize depth scale, disable on 2D polygons, tolerance) and the values DuckStation uses for Spider-Man 2 (CPU mode on and tolerance 3, as its game database does by itself), in the **PGXP options...** window; as in DuckStation, lines at their precise positions too. When you turn it on, **Play** builds the game again with the hooks PGXP needs (only once, with the ready-made PGO profile for this variant too). Measured item by item in the game on 6 November 2026: every item really changes the drawing and, as in DuckStation, depth applies to the whole polygon (quads included, which the engine draws as two triangles) and Depth Bias is counted per polygon; with the defaults, 83% of the triangles have every vertex precise.
+- **Faster installation:** ready-made PGO profiles for the three main versions (no training run), the engine already built in the package and, when reinstalling with the same disc and the same engine, no translation of the game code. On top of that the game's final link uses as many threads as the build cores (by itself it used one per physical core: 2 instead of 3 on the test laptop); only the number of threads changes, not the code. Measured on 7 November 2026 on the test PC limited to 4 processors, like a laptop: the final link of USA Rev 1 with PGO goes from about 200 to about 160 seconds and the whole installation takes about 355 seconds (Europe without PGO about 220).
+- **Updates without reinstalling:** the new launcher takes the games, discs and saves from the previous version's folder and asks to reinstall only when the engine changes. Going from 0.11 to 0.12 needs one reinstall.
+- **Widescreen "Fit to window":** an extra choice of the Widescreen mod: the picture takes the shape of the window and follows it when you resize it, from 4:3 up; the 16:9, 16:10 and 21:9 choices stay as before. The idea comes from the widescreen mod by Matthew Stanley, the author of psxrecomp.
+- **Less tearing:** on screens faster than the game, adaptive vertical sync becomes normal sync (before, in fullscreen, the picture always tore); the "Recommended settings for slow PCs" choose vertical sync on and no longer turn on the render thread (on NVIDIA graphics cards it turned vertical sync off: that was the tearing seen on the test laptop).
+- **Less stutter:** on screens that are a multiple of the game's rate (120 and 240 Hz with USA and Japan, 100 and 200 Hz with Europe) the game's rhythm follows the refresh (with USA 60.000 frames per second instead of 59.94, as already on 60 Hz screens) and, windowed, the moment of the swap stays in the middle of the refresh, using the screen's scanline read from Windows: every frame stays on screen for the same number of refreshes. Measured on the test PC (240 Hz screen), windowed: 0 vblank crossings in 20 seconds instead of 101 (each one was a frame left on screen one refresh too long or too short). In fullscreen (borderless or exclusive) the graphics driver decides the moment of every frame: there the correction turns itself off and nothing changes for stutter compared with before.
+- **Game recorder (for testing):** in test installations with the recorder the game starts with compilation on the fly turned off, so a recorded session replays exactly also where the game finds new code (before, the replay stopped there).
+- **Overlay toolchain in the package:** the small toolchain psxrecomp uses to compile on your PC, while you play, the game code that was not compiled in advance (Python 3.13.1 embeddable and TinyCC 0.9.27, with the TinyCC source) is now in the package: before, with an internet connection, every installation downloaded it by itself, and without internet that code always ran in the interpreter.
 
-New features reach the main versions first: USA Rev 1, the original USA release and one European version. The others (the other European version, France, Germany, Japan) stay installable and playable and get the new features when the extra work is small; features that do not depend on the version, such as the launcher, the controller and memory cards, apply to all of them at once.
+## Known issues in 0.12
+
+- the picture is not completely steady when the screen is not a multiple of the game's rate (for example Europe, at 50 Hz, on a 60 or 144 Hz screen, or USA on a 144 or 165 Hz screen) and, on 120 and 240 Hz screens, in fullscreen: now and then a frame stays on screen one refresh longer; with an active G-Sync or FreeSync screen the VRR vertical sync avoids it;
+- widescreen: in a few places an object very close to the camera appears cut off at the edge of the original 4:3 picture;
+- on low-end PCs, small slowdowns in a few heavy places (the Create-a-Spidey menu at 1080p, the turrets in "Rooftops By Night", the final battle with Sandman);
+- objects visible through walls and ceilings: a light in "In Darkest Night" and, in the complete 0.12 playthrough, pipes and pieces of the ventilation ducts and a health item that should be covered; probably the same thing as the low walls (below), still to be checked; they do not stop you from finishing the game;
+- on NVIDIA graphics cards the "render thread" option turns vertical sync off (except in exclusive fullscreen) and in borderless fullscreen the picture can tear: in 0.12 the "Recommended settings for slow PCs" no longer turn it on;
+- two behaviours seen in the automated tests, to be understood better: a difference at the first start of a new executable, and a slow exit of the Japanese test executable.
+
+## Checked: behaviour of the original game
+
+- **Spider-Man visible through low walls** (in the first level and in others). EnterElectro-Recomp draws exactly like the PlayStation: with the same keys, frame by frame, the OpenGL renderer and the "software" one (which redoes the PlayStation pixel by pixel) give the same pictures, also at 1080p. It is the original game that sorts its polygons from far to near, because the PlayStation has no depth buffer: with large walls close to the camera the order is sometimes wrong. The PGXP depth buffer (like DuckStation's) was tried: it wrongly hides pieces of Spider-Man, so it is not used. It can be fixed for real with the rewritten drawing code after 0.12.
+
+## Game versions
+
+New features reach the main versions first: USA Rev 1, the original USA release and the original European release. The others (Europe/Australia Rev 1, France, Germany, Japan) stay installable and playable and get the new features when the extra work is small; features that do not depend on the version, such as the launcher, the controller and memory cards, apply to all of them at once.
 
 ## Always, in parallel
 
-- Proposing to the psxrecomp authors the fixes and optimisations made for SM2-Recomp, so that they can become part of psxrecomp and the package carries fewer changes of its own.
+- Proposing to the psxrecomp authors the fixes and optimisations made for EnterElectro-Recomp (since 0.12 also enhanced movies, start-up volume and the compiler cache across folders), so that they can become part of psxrecomp and the package carries fewer changes of its own.
 - Automated tests for every version, including real play sessions recorded once and replayed by the program.
 
-## Later: the game rewritten by hand
+## After 0.12: the game rewritten by hand
 
 - Gradually replacing the most important parts of the game with hand-written code, starting from USA Rev 1: first drawing (widescreen without cut-offs, real draw distance), then camera and controls, then the menus, with PC options inside the game. The rewritten game will read data, text and voices from the player's own disc, of any version. Every rewritten part must behave like the original, and recorded play sessions will prove it. It is the longest piece of work.
 - Vulkan as an extra choice will be considered once drawing is rewritten: today, on the test laptop, it performs like OpenGL.
+- **Less stutter also in fullscreen and on other screens:** the locked rhythm of 0.12 works windowed on screens that are a multiple of the game's rate; in fullscreen the graphics driver decides the moment of every frame, and on other screens (for example 144 Hz) the game's rate does not fit a whole number of times: another way must be found, measured with a full recorded playthrough.
+- **"Projection" widescreen:** trying the approach of Matthew Stanley's widescreen mod, which squeezes the wider scene into the game's screen instead of drawing extra pixels at the sides: it could remove the cut-offs near the camera. A first comparison in the first level went well (same scene, no holes, same speed); the decision will come from tests in all levels and all versions.
+- **Even faster installation:** the ready PGO profile comes from the training session in the first level (about 6,000 functions). On 7 November 2026 the game files in which it saw nothing run (71 of 125 in USA Rev 1) were tried without the profile, also without ThinLTO (final link from about 160 to about 72 seconds on 4 processors): averaged over four runs the game ran 12-16% slower in e1m1 (and, without ThinLTO, also in e4m1), while in the other levels the differences stayed within the spread of the measurements (up to about a quarter between two runs of the same executable), so it is not in 0.12. It can be tried again with a profile made from recorded sessions of all levels and with steadier measurements. A repeatable final link with PGO is still to do: two links in a row differ only in the function order the link picks from the profile, and without that order they are identical (test of 6 November 2026).
